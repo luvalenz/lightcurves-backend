@@ -1,0 +1,5 @@
+clusters_path: '/media/lucas/115d830f-0d51-49ad-8a2f-84544fbab639/web_clusters'
+data_path: '/media/lucas/115d830f-0d51-49ad-8a2f-84544fbab639/MACHO_features_Harmonics'
+radius: 5.0
+dimensionality_reduction: 'ipca'
+dimensionality: 5
