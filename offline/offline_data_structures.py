@@ -8,10 +8,25 @@ import matplotlib.pyplot as plt
 import scipy.spatial.distance as dist
 import os
 import pickle
+from abc import ABCMeta
 
 #python 2
 
-class Birch:
+class Picklable:
+    __metaclass__ = ABCMeta
+
+    @staticmethod
+    def from_pickle(path):
+        pkl_file = open(path, 'rb')
+        return pickle.load(pkl_file)
+
+    def to_pickle(self, path, file_name):
+        output = open(os.path.join(path, '{0}.pkl'.format(file_name)), 'wb')
+        pickle.dump(self, output)
+        output.close()
+
+
+class Birch(Picklable):
 
     def __init__(self, threshold, cluster_distance_measure='d0', cluster_size_measure='r', branching_factor=50, data_in_memory=True):
         self.branching_factor = branching_factor
@@ -78,16 +93,6 @@ class Birch:
                 sizes.append(data_points.shape[0])
         pd.DataFrame(radii).to_csv(os.path.join(full_path, 'radii.csv'))
         pd.DataFrame(sizes).to_csv(os.path.join(full_path, 'sizes.csv'))
-
-    def to_pickle(self, path):
-        output = open(os.path.join(path, 'birch.pkl'), 'wb')
-        pickle.dump(self, output)
-        output.close()
-
-    @staticmethod
-    def from_pickle(path):
-        pkl_file = open(path, 'rb')
-        return pickle.load(pkl_file)
 
     def calculate_labels(self):
         clusters = self.root.get_clusters()
@@ -368,8 +373,7 @@ class NonLeafClusteringFeature(ClusteringFeature):
         self.child.add(index, data_point_cf)
 
 
-
-class IncrementalPCA:
+class IncrementalPCA(Picklable):
     def __init__(self, n_components = None):
         self.n_components = n_components
         self.cov = None
@@ -464,14 +468,3 @@ class IncrementalPCA:
     def add_transform(self, X):
         self.add(X)
         return self.transform(X)
-
-    def to_pickle(self, path):
-        output = open(os.path.join(path, 'ipca.pkl'), 'wb')
-        pickle.dump(self, output)
-        output.close()
-
-    @staticmethod
-    def from_pickle(path):
-        pkl_file = open(path, 'rb')
-        return pickle.load(pkl_file)
-

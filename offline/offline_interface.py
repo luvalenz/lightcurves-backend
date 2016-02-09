@@ -46,8 +46,12 @@ def add_data(dataframe):
     reduced_data = reduction_model.add_transform(dataframe.values)
     birch.add_pandas_data_frame(pd.DataFrame(reduced_data, index=dataframe.index.values))
     birch.to_files(full_path)
-    birch.to_pickle(full_path)
-    reduction_model.to_pickle(reduction_model)
+    birch.to_pickle(full_path, 'birch')
+    reduction_model.to_pickle(full_path, 'reduction_model')
+
+
+
+
 
 
 

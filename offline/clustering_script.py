@@ -6,3 +6,5 @@ if __name__ == '__main__':
     print(len(macho_field))
     macho_field = macho_field[:500]
     add_data(macho_field)
+    print('ready')
+
