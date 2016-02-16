@@ -12,6 +12,7 @@ from abc import ABCMeta
 
 #python 2
 
+
 class Picklable:
     __metaclass__ = ABCMeta
 
@@ -28,23 +29,33 @@ class Picklable:
 
 class Birch(Picklable):
 
-    def __init__(self, threshold, cluster_distance_measure='d0', cluster_size_measure='r', branching_factor=50, data_in_memory=True):
+    def __init__(self, threshold, cluster_distance_measure='d0', cluster_size_measure='r', n_global_clusters=50, branching_factor=50, data_in_memory=True):
         self.branching_factor = branching_factor
         self.threshold = threshold
         self.cluster_size_measure = cluster_size_measure
         self.cluster_distance_measure = cluster_distance_measure
         self.root = BirchNode(self, True)
         self._labels = None
+        self._global_labels = None
         self.data_in_memory = data_in_memory
         self.data = None
+        self.n_global_clusters = n_global_clusters
 
     @property
     def has_labels(self):
         return self._labels is not None
 
     @property
+    def has_global_labels(self):
+        return self._global_labels is not None
+
+    @property
     def n_data(self):
         return self.data.shape[0]
+
+    @property
+    def dimensionality(self):
+        return self.data.shape[1]
 
     @property
     def labels(self):
@@ -53,10 +64,47 @@ class Birch(Picklable):
         return self._labels
 
     @property
+    def global_labels(self):
+        if not self.has_global_labels:
+            self.do_global_clustering()
+        return self._global_labels
+
+    @property
     def centers(self):
         if not self.has_labels:
             self.calculate_labels()
-        return self._centers
+        return (self._linear_sums.T / self._ns_data).T
+
+
+    @property
+    def squared_norms(self):
+        if not self.has_labels:
+            self.calculate_labels()
+        return self._squared_norms
+
+    @property
+    def linear_sums(self):
+        if not self.has_labels:
+            self.calculate_labels()
+        return self._linear_sums
+
+    @property
+    def ns_data(self):
+        if not self.has_labels:
+            self.calculate_labels()
+        return self._ns_data
+
+    @property
+    def global_labels(self):
+        if not self.has_global_labels:
+            self.do_global_clustering()
+        return self._global_labels
+
+    @property
+    def global_centers(self):
+        if not self.has_labels:
+            self.do_global_clustering()
+        return self._global_centers
 
     @property
     def unique_labels(self):
@@ -65,13 +113,25 @@ class Birch(Picklable):
         return list(set(self.labels[:,1].tolist()))
 
     @property
+    def unique_global_labels(self):
+        if not self.has_global_labels:
+            self.do_global_clustering()
+        return list(set(self.global_labels[:,1].tolist()))
+
+    @property
     def number_of_labels(self):
         if not self.has_labels:
             self.calculate_labels()
         return len(self.unique_labels)
 
-    def to_files(self, path):
-        full_path = os.path.join(path, 'clusters')
+    @property
+    def number_of_global_labels(self):
+        if not self.has_global_labels:
+            self.do_global_clustering()
+        return len(self.unique_global_labels)
+
+    def to_files(self, name, path):
+        full_path = os.path.join(path, name)
         if not os.path.exists(full_path):
             try:
                 os.makedirs(full_path)
@@ -94,19 +154,103 @@ class Birch(Picklable):
         pd.DataFrame(radii).to_csv(os.path.join(full_path, 'radii.csv'))
         pd.DataFrame(sizes).to_csv(os.path.join(full_path, 'sizes.csv'))
 
+    def to_pickle(self, name, path):
+        output = open(os.path.join(path, '{0}_birch.pkl'.format(name)), 'wb')
+        pickle.dump(self, output)
+        output.close()
+
+    @staticmethod
+    def from_pickle(path):
+        pkl_file = open(path, 'rb')
+        return pickle.load(pkl_file)
+
     def calculate_labels(self):
         clusters = self.root.get_clusters()
         labels = np.empty((0,2))
         next_label = 0
-        centers = []
+        ns_data = []
+        squared_norms = []
+        linear_sums = []
         for cluster in clusters:
-            center, indices = cluster
-            centers.append(center)
+            indices = cluster.get_indices()
+            ns_data.append(cluster.n_data)
+            squared_norms.append(cluster.squared_norm)
+            linear_sums.append(cluster.linear_sum)
             cluster_labels = np.column_stack((indices, next_label*np.ones(len(indices))))
             labels = np.vstack((labels, cluster_labels))
             next_label += 1
         self._labels = labels
-        self._centers = np.array(centers)
+        self._ns_data = np.array(ns_data)
+        self._linear_sums = np.vstack(linear_sums)
+        self.squared_norms = np.array(squared_norms)
+
+    def do_global_clustering(self):
+        ns_data = self.ns_data
+        linear_sums = self.linear_sums
+        squared_norms = self.squared_norms
+        n_clusters = len(ns_data)
+        distances = []
+        indices_dict = {}
+        for i in range(n_clusters):
+            indices_dict[i] = [i]
+        for i, j in itertools.product(range(n_clusters), repeat=2):
+            distance = np.inf
+            if i < j:
+                distance = self.d2(ns_data[i], linear_sums[i], squared_norms[i], ns_data[j], linear_sums[j], squared_norms[j])
+            distances.append(distance)
+        distances = np.array(distances)
+        n_global_clusters = n_clusters
+        while n_global_clusters > self.n_global_clusters:
+            min_index = np.argmin(distances)
+            min_i, min_j = min_index/n_clusters, min_index%n_clusters
+            distances[min_index] = np.inf
+            indices_dict[min_i] += indices_dict[min_j]
+            del indices_dict[min_j]
+            j_indices = []
+            for k in range(n_clusters):
+                if k != min_i and k != min_j:
+                    if k < min_i:
+                        index_i = k*n_clusters + min_i
+                    else:
+                        index_i = min_i*n_clusters + k
+                    if k < min_j:
+                        index_j = k*n_clusters + min_j
+                    else:
+                        index_j = min_j*n_clusters + k
+                    distance_i = distances[index_i]
+                    distance_j = distances[index_j]
+                    n_data_i = ns_data[min_i]
+                    n_data_j = ns_data[min_j]
+                    new_distance = np.sqrt((n_data_i*distance_i**2 + n_data_j*distance_j**2)/(n_data_i + n_data_j))
+                    distances[index_i] = new_distance
+                    j_indices.append(index_j)
+            distances[j_indices] = np.inf
+            n_global_clusters -= 1
+        indices_list = list(indices_dict.values())
+        self._build_global_clusters(indices_list)
+
+    def _build_global_clusters(self, indices_list):
+        #TODO BUILD CENTERS
+        global_centers = []
+        global_labels = []
+        next_global_label = 0
+        for cluster_indices in indices_list:
+            linear_sum = np.sum(self.linear_sums[cluster_indices], axis=0)
+            n_data = np.sum(self.ns_data[cluster_indices])
+            center = linear_sum / n_data
+            global_centers.append(center)
+            index_mask = []
+            for index in cluster_indices:
+                index_mask.append(self.labels[:,1] == index)
+            index_mask = np.vstack(index_mask)
+            index_mask = np.any(index_mask, axis=0)
+            data_indices = self.labels[index_mask, 0]
+            global_cluster_labels = np.column_stack((data_indices, next_global_label*np.ones(len(data_indices))))
+            global_labels.append(global_cluster_labels)
+            next_global_label += 1
+        self._global_centers = np.vstack(global_centers)
+        self._global_labels = np.vstack(global_labels)
+
 
     def violates_threshold(self, n_data, linear_sum, squared_norm):
         return self.cluster_size(n_data, linear_sum, squared_norm) >= self.threshold
@@ -129,6 +273,7 @@ class Birch(Picklable):
 
     def add_pandas_data_frame(self, data_frame):
         self._labels = None
+        self._global_labels = None
         indices = data_frame.index.values
         data_points = data_frame.values
         for index, data_point in itertools.izip(indices, data_points):
@@ -152,7 +297,8 @@ class Birch(Picklable):
     def radius(n_data, linear_sum, squared_norm):
         n_data, linear_sum, squared_norm = Birch.to_float(n_data, linear_sum, squared_norm)
         centroid = linear_sum/n_data
-        return np.sqrt(squared_norm/n_data - np.linalg.norm(centroid)**2)
+        result = np.sqrt(squared_norm/n_data - np.linalg.norm(centroid)**2)
+        return result
 
     @staticmethod
     def diameter(n_data, linear_sum, squared_norm):
@@ -202,18 +348,36 @@ class BirchNode:
 
     def __init__(self, birch, is_leaf = False):
         self.birch = birch
-        self.clustering_features = []
+        self._clustering_features = []
         self.is_leaf = is_leaf
         self.cf_parent = None
+        global number
+        self.number = number
+        number += 1
 
     @property
     def size(self):
-        return len(self.clustering_features)
+        return len(self._clustering_features)
 
 
     @property
     def has_to_split(self):
-        return len(self.clustering_features) > self.birch.branching_factor
+        return len(self._clustering_features) > self.birch.branching_factor
+
+    @property
+    def is_full(self):
+        return len(self._clustering_features) >= self.birch.branching_factor
+
+    @property
+    def cf_sum(self):
+        n_data_sum = 0
+        linear_sum_sum = 0
+        squared_norm_sum = 0
+        for cf in self._clustering_features:
+            n_data_sum += cf.n_data
+            linear_sum_sum += cf.linear_sum
+            squared_norm_sum += cf.squared_norm
+        return n_data_sum, linear_sum_sum, squared_norm_sum
 
     @property
     def is_root(self):
@@ -228,81 +392,164 @@ class BirchNode:
 
     def add(self, index, data_point_cf):
         data_point, squared_norm = data_point_cf
-        if len(self.clustering_features) == 0:
-            new_cf = LeafClusteringFeature(self.birch, self)
-            self.clustering_features.append(new_cf)
+        if len(self._clustering_features) == 0:
+            new_cf = LeafClusteringFeature(self.birch)
+            self.add_clustering_feature(new_cf)
             new_cf.add(index, data_point_cf)
         else:
             distances = []
-            for cf in self.clustering_features:
+            for cf in self._clustering_features:
                 distance = cf.distance(1, data_point, squared_norm)
                 distances.append(distance)
-            best_cf = self.clustering_features[np.argmin(distances)]
+            best_cf = self._clustering_features[np.argmin(distances)]
             can_be_added = best_cf.can_add(index, data_point_cf)
             if can_be_added:
-                cf.add(index, data_point_cf)
+                best_cf.add(index, data_point_cf)
             else:
-                new_cf = LeafClusteringFeature(self.birch, self)
+                new_cf = LeafClusteringFeature(self.birch)
+                self.add_clustering_feature(new_cf)
                 new_cf.add(index, data_point_cf)
-                self.clustering_features.append(new_cf)
                 if self.has_to_split:
                     self.split()
+
+    def add_clustering_feature(self, cf):
+        self._clustering_features.append(cf)
+        cf.node = self
+        if not self.is_root and not cf.is_empty:
+            self.cf_parent.update(cf.n_data, cf.linear_sum, cf.squared_norm)
+
 
     #returns tuple with center and indices of leaf clusters
     def get_clusters(self):
         clusters = []
         if self.is_leaf:
-            for cf in self.clustering_features:
-                clusters.append((cf.centroid, cf.get_indices()))
+            for cf in self._clustering_features:
+                clusters.append(cf)
         else:
-            for cf in self.clustering_features:
+            for cf in self._clustering_features:
                 clusters += cf.get_clusters()
         return clusters
 
-    def replace_cfs(self, old_cf, new_cf1, new_cf2):
-        self.clustering_features.remove(old_cf)
-        self.clustering_features.append(new_cf1)
-        self.clustering_features.append(new_cf2)
+    #only use on splits
+    def replace_cf(self, old_cf, cf1, cf2):
+        self._clustering_features.remove(old_cf)
+        self._clustering_features.append(cf1)
+        self._clustering_features.append(cf2)
+        cf1.node = self
+        cf2.node = self
+
+    #only use on merges
+    def merge_replace_cf(self, new_cf, cf1, cf2):
+        self._clustering_features.append(new_cf)
+        self._clustering_features.remove(cf1)
+        self._clustering_features.remove(cf2)
+        new_cf.node = self
+
+    #TODO
+    def merging_refinement(self, splitted_cf0, splitted_cf1):
+        distances = {}
+        i = 0
+        cfs = self._clustering_features
+        for cf1 in cfs:
+            j = i + 1
+            for cf2 in cfs[j:]:
+                distances[(i, j)] = self.birch.cluster_distance(cf1.n_data, cf1.linear_sum, cf1.squared_norm, cf2.n_data, cf2.linear_sum, cf2.squared_norm)
+                j += 1
+            i += 1
+        seeds_indices = min(distances.iteritems(), key=operator.itemgetter(1))[0]
+        merger0 = cfs[seeds_indices[0]]
+        merger1 = cfs[seeds_indices[1]]
+        if merger0 is splitted_cf0 and merger1 is splitted_cf1 or merger0 is splitted_cf1 and merger1 is splitted_cf0:
+            return
+        new_node = BirchNode(self.birch, self.is_leaf)
+        new_cf = NonLeafClusteringFeature(self.birch, new_node)
+        mergers_cfs = merger0.child._clustering_features + merger1.child._clustering_features
+        for cf in mergers_cfs:
+            new_node.add_clustering_feature(cf)
+        self.merge_replace_cf(new_cf, merger0, merger1)
 
 
     def split(self):
-        node1 = BirchNode(self.birch, self.is_leaf)
-        node2 = BirchNode(self.birch, self.is_leaf)
-        node1.clustering_features = self.clustering_features[:-1]
-        node2.clustering_features = [self.clustering_features[-1]]
+        last_split = True
+        new_node0 = BirchNode(self.birch, self.is_leaf)
+        new_node1 = BirchNode(self.birch, self.is_leaf)
+        new_cf0 = NonLeafClusteringFeature(self.birch, new_node0)
+        new_cf1 = NonLeafClusteringFeature(self.birch, new_node1)
+
+        cfs = self._clustering_features
+        distances = {}
+        i = 0
+        for cf1 in cfs:
+            j = i + 1
+            for cf2 in cfs[j:]:
+                distances[(i, j)] = self.birch.cluster_distance(cf1.n_data, cf1.linear_sum, cf1.squared_norm, cf2.n_data, cf2.linear_sum, cf2.squared_norm)
+                j += 1
+            i += 1
+        seeds_indices = max(distances.iteritems(), key=operator.itemgetter(1))[0]
+        seed0 = cfs[seeds_indices[0]]
+        seed1 = cfs[seeds_indices[1]]
+        new_node0.add_clustering_feature(seed0)
+        new_node1.add_clustering_feature(seed1)
+        cfs.remove(seed0)
+        cfs.remove(seed1)
+        new_nodes = [new_node0, new_node1]
+        while len(cfs) != 0:
+            next_cf = cfs[0]
+            dist0 = self.birch.cluster_distance(new_cf0.n_data, new_cf0.linear_sum, new_cf0.squared_norm, next_cf.n_data, next_cf.linear_sum, next_cf.squared_norm)
+            dist1 = self.birch.cluster_distance(new_cf1.n_data, new_cf1.linear_sum, new_cf1.squared_norm, next_cf.n_data, next_cf.linear_sum, next_cf.squared_norm)
+            closest_node, furthest_node = [new_nodes[i] for i in np.argsort([dist0, dist1])]
+            if closest_node.is_full:
+                furthest_node.add_clustering_feature(next_cf)
+            else:
+                closest_node.add_clustering_feature(next_cf)
+            cfs.remove(next_cf)
+
         if self.is_root:
             new_root = BirchNode(self.birch, False)
-            cf1 = NonLeafClusteringFeature(self.birch, new_root, node1)
-            cf2 = NonLeafClusteringFeature(self.birch, new_root, node2)
-            new_root.clustering_features = [cf1, cf2]
+            new_root.add_clustering_feature(new_cf0)
+            new_root.add_clustering_feature(new_cf1)
             self.birch.root = new_root
+            last_split_node = new_root
         else:
-            cf1 = NonLeafClusteringFeature(self.birch, self.node_parent, node1)
-            cf2 = NonLeafClusteringFeature(self.birch, self.node_parent, node2)
-            self.node_parent.replace_cfs(self.cf_parent, cf1, cf2)
+            self.node_parent.replace_cf(self.cf_parent, new_cf0, new_cf1)
             if self.node_parent.has_to_split:
+                last_split = False
                 self.node_parent.split()
+            else:
+                last_split_node = self.node_parent
+        if last_split:
+            last_split_node.merging_refinement(new_cf0, new_cf1)
 
 
 class ClusteringFeature:
 
     __metaclass__ = ABCMeta
 
-    def __init__(self, birch, node, n_data, linear_sum, squared_norm):
+    def __init__(self, birch, n_data, linear_sum, squared_norm):
         self.birch = birch
-        self.node = node
         self.linear_sum = linear_sum
         self.squared_norm = squared_norm
         self.n_data = n_data
+        self.node = None
+        global number
+        self.number = number
+        number += 1
+
 
     @property
     def cf_parent(self):
+        if self.node is None:
+            return None
         return self.node.cf_parent
 
+    @property
+    def is_empty(self):
+        return self.n_data == 0
 
     @property
     def centroid(self):
         return self.linear_sum / self.n_data
+
 
     def update(self, n_data_increment, linear_sum_increment, squared_norm_increment):
         self.linear_sum += linear_sum_increment
@@ -325,9 +572,9 @@ class ClusteringFeature:
 
 class LeafClusteringFeature(ClusteringFeature):
 
-    def __init__(self, birch, node):
+    def __init__(self, birch):
         self.data_indices = []
-        super(LeafClusteringFeature, self).__init__(birch, node, 0, 0, 0)
+        super(LeafClusteringFeature, self).__init__(birch, 0, 0, 0)
 
     def can_add(self, index, data_point_cf):
         data_point, squared_norm = data_point_cf
@@ -338,12 +585,10 @@ class LeafClusteringFeature(ClusteringFeature):
             return True
         return False
 
-
     def add(self, index, data_point_cf):
         data_point, squared_norm = data_point_cf
         self.update(1, data_point, squared_norm)
         self.data_indices.append(index)
-
 
     def get_indices(self):
         return self.data_indices
@@ -351,17 +596,18 @@ class LeafClusteringFeature(ClusteringFeature):
 
 class NonLeafClusteringFeature(ClusteringFeature):
 
-    def __init__(self, birch, node, child_node):
+    def __init__(self, birch, child_node):
         n_data = 0
         linear_sum = 0
         squared_norm = 0
-        for cf in child_node.clustering_features:
-            n_data += cf.n_data
-            linear_sum += cf.linear_sum
-            squared_norm += cf.squared_norm
-        super(NonLeafClusteringFeature, self).__init__(birch, node, n_data, linear_sum, squared_norm)
+        super(NonLeafClusteringFeature, self).__init__(birch, n_data, linear_sum, squared_norm)
+        self.set_child(child_node)
+
+    def set_child(self, child_node):
         self.child = child_node
         child_node.cf_parent = self
+        self.n_data, self.linear_sum, self.squared_norm = child_node.cf_sum
+
 
     def can_add(self, index, data_point):
         return True
