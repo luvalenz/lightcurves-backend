@@ -4,8 +4,27 @@ from abc import ABCMeta, abstractmethod, abstractproperty
 from collections import OrderedDict
 import numpy as np
 
+
 class TimeSeriesDataBase(object):
-    pass
+    __metaclass__ = ABCMeta
+
+    @abstractmethod
+    def get_one(self, id_):
+        pass
+
+    @abstractmethod
+    def get_many(self, id_list):
+        pass
+
+    #can receive TimeSeries object or dict
+    @abstractmethod
+    def update(self, id_, updated_values):
+        pass
+
+    #can receive TimeSeries object or dict
+    @abstractmethod
+    def add(self, data):
+        pass
 
 
 class TimeSeriesFileDataBase(TimeSeriesDataBase):
@@ -17,6 +36,7 @@ class TimeSeriesMongoDataBase(TimeSeriesDataBase):
 
 
 class MultibandTimeSeries(object):
+    __metaclass__ = ABCMeta
 
     @abstractproperty
     def period(self):

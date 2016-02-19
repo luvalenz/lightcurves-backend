@@ -25,43 +25,35 @@ class Picklable:
         output.close()
 
 
-class Clustering:
+class IncrementalClustering:
     __metaclass__ = ABCMeta
 
     @abstractproperty
     def centers(self):
         pass
 
-    # @abstractproperty
-    # def labels(self):
-    #     pass
-    #
-    # @abstractmethod
-    # def generate_labels(self):
-    #     pass
-    #
-    @classmethod
-    def lala(cls):
-        cls.lala = 1
-
-
-class Birch(Clustering):
-
-    @property
-    def centers(self):
-        return 1
-
-    @property
+    @abstractproperty
     def labels(self):
-         super(B, self)
+        pass
 
+    @abstractproperty
+    def unique_labels(self):
+        pass
 
+    @abstractmethod
     def generate_labels(self):
         pass
 
+    @abstractmethod
+    def generate_labels(self):
+        pass
+
+    @abstractmethod
+    def to_database(self, database):
+        pass
 
 
-class Birch(Picklable, Clustering):
+class Birch(Picklable, IncrementalClustering):
 
     def __init__(self, threshold, cluster_distance_measure='d0', cluster_size_measure='r', n_global_clusters=50, branching_factor=50):
         self.branching_factor = branching_factor
@@ -71,7 +63,7 @@ class Birch(Picklable, Clustering):
         self.root = BirchNode(self, True)
         self._labels = None
         self._global_labels = None
-        self.data = None
+        self.n_data = 0
         self.n_global_clusters = n_global_clusters
 
     @property
@@ -84,11 +76,11 @@ class Birch(Picklable, Clustering):
 
     @property
     def n_data(self):
-        return self.data.shape[0]
-
-    @property
-    def dimensionality(self):
-        return self.data.shape[1]
+        cfs = self.root._clustering_features
+        result = 0
+        for cf in cfs:
+            result += cf.n_data
+        return result
 
     @property
     def labels(self):
@@ -649,7 +641,6 @@ class NonLeafClusteringFeature(ClusteringFeature):
 
     def add(self, index, data_point_cf):
         self.child.add(index, data_point_cf)
-
 
 
 class IncrementalPCA(Picklable):
