@@ -1,14 +1,12 @@
 __author__ = 'lucas'
 
 import numpy as np
-from abc import ABCMeta, abstractmethod
+from abc import ABCMeta, abstractmethod, abstractproperty
 import itertools
 import pandas as pd
-import matplotlib.pyplot as plt
 import scipy.spatial.distance as dist
 import os
 import pickle
-from abc import ABCMeta
 
 #python 2
 
@@ -27,9 +25,45 @@ class Picklable:
         output.close()
 
 
-class Birch(Picklable):
+class Clustering:
+    __metaclass__ = ABCMeta
 
-    def __init__(self, threshold, cluster_distance_measure='d0', cluster_size_measure='r', n_global_clusters=50, branching_factor=50, data_in_memory=True):
+    @abstractproperty
+    def centers(self):
+        pass
+
+    # @abstractproperty
+    # def labels(self):
+    #     pass
+    #
+    # @abstractmethod
+    # def generate_labels(self):
+    #     pass
+    #
+    @classmethod
+    def lala(cls):
+        cls.lala = 1
+
+
+class Birch(Clustering):
+
+    @property
+    def centers(self):
+        return 1
+
+    @property
+    def labels(self):
+         super(B, self)
+
+
+    def generate_labels(self):
+        pass
+
+
+
+class Birch(Picklable, Clustering):
+
+    def __init__(self, threshold, cluster_distance_measure='d0', cluster_size_measure='r', n_global_clusters=50, branching_factor=50):
         self.branching_factor = branching_factor
         self.threshold = threshold
         self.cluster_size_measure = cluster_size_measure
@@ -37,7 +71,6 @@ class Birch(Picklable):
         self.root = BirchNode(self, True)
         self._labels = None
         self._global_labels = None
-        self.data_in_memory = data_in_memory
         self.data = None
         self.n_global_clusters = n_global_clusters
 
@@ -60,7 +93,7 @@ class Birch(Picklable):
     @property
     def labels(self):
         if not self.has_labels:
-            self.calculate_labels()
+            self.generate_labels()
         return self._labels
 
     @property
@@ -72,26 +105,25 @@ class Birch(Picklable):
     @property
     def centers(self):
         if not self.has_labels:
-            self.calculate_labels()
+            self.generate_labels()
         return (self._linear_sums.T / self._ns_data).T
-
 
     @property
     def squared_norms(self):
         if not self.has_labels:
-            self.calculate_labels()
+            self.generate_labels()
         return self._squared_norms
 
     @property
     def linear_sums(self):
         if not self.has_labels:
-            self.calculate_labels()
+            self.generate_labels()
         return self._linear_sums
 
     @property
     def ns_data(self):
         if not self.has_labels:
-            self.calculate_labels()
+            self.generate_labels()
         return self._ns_data
 
     @property
@@ -109,7 +141,7 @@ class Birch(Picklable):
     @property
     def unique_labels(self):
         if not self.has_labels:
-            self.calculate_labels()
+            self.generate_labels()
         return list(set(self.labels[:,1].tolist()))
 
     @property
@@ -121,7 +153,7 @@ class Birch(Picklable):
     @property
     def number_of_labels(self):
         if not self.has_labels:
-            self.calculate_labels()
+            self.generate_labels()
         return len(self.unique_labels)
 
     @property
@@ -164,7 +196,7 @@ class Birch(Picklable):
         pkl_file = open(path, 'rb')
         return pickle.load(pkl_file)
 
-    def calculate_labels(self):
+    def generate_labels(self):
         clusters = self.root.get_clusters()
         labels = np.empty((0,2))
         next_label = 0
@@ -617,6 +649,7 @@ class NonLeafClusteringFeature(ClusteringFeature):
 
     def add(self, index, data_point_cf):
         self.child.add(index, data_point_cf)
+
 
 
 class IncrementalPCA(Picklable):
