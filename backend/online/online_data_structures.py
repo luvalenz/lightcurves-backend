@@ -5,6 +5,7 @@ import pandas as pd
 import scipy.spatial.distance as dist
 import os
 
+
 class OurMethodCluster:
 
     @property
@@ -26,6 +27,7 @@ class OurMethodCluster:
         #     return self.sorted_data, self.sorted_data_ids
         ring_indices = np.where(self.sorted_distances > self.radius - width)[0]
         return self.sorted_data[ring_indices], self.sorted_data_ids[ring_indices]
+
 
 class OurMethod:
 
