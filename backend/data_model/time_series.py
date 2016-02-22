@@ -1,7 +1,6 @@
 __author__ = 'lucas'
 
 from abc import ABCMeta, abstractmethod, abstractproperty
-from collections import OrderedDict
 import numpy as np
 
 
@@ -9,11 +8,15 @@ class TimeSeriesDataBase(object):
     __metaclass__ = ABCMeta
 
     @abstractmethod
-    def get_one(self, id_):
+    def get_one(self, id_, original=True, phase=True, features=True):
         pass
 
     @abstractmethod
-    def get_many(self, id_list):
+    def get_many(self, id_list, original=True, phase=True, features=True):
+        pass
+
+    @abstractmethod
+    def get_features(self, id_):
         pass
 
     #can receive TimeSeries object or dict
@@ -39,6 +42,10 @@ class MultibandTimeSeries(object):
     __metaclass__ = ABCMeta
 
     @abstractproperty
+    def id(self):
+        pass
+
+    @abstractproperty
     def period(self):
         pass
 
@@ -54,17 +61,13 @@ class MultibandTimeSeries(object):
     def feature_dictionary(self):
         pass
 
-    @abstractproperty
-    def is_interpolated(self):
-        pass
+    # @abstractproperty
+    # def is_interpolated(self):
+    #     pass
 
-    @abstractproperty
-    def is_folded(self):
-        pass
-
-    @abstractproperty
-    def interpolation_resolution(self):
-        pass
+    # @abstractproperty
+    # def interpolation_resolution(self):
+    #     pass
 
     @abstractproperty
     def times(self):
@@ -78,20 +81,20 @@ class MultibandTimeSeries(object):
     def errors(self):
         pass
 
+    # @abstractproperty
+    # def interpolated_time(self):
+    #     pass
+
+    # @abstractproperty
+    # def interpolated_values(self):
+    #     pass
+
     @abstractproperty
-    def interpolated_time(self):
+    def phase(self):
         pass
 
     @abstractproperty
-    def interpolated_values(self):
-        pass
-
-    @abstractproperty
-    def folded_phase(self):
-        pass
-
-    @abstractproperty
-    def folded_values(self):
+    def is_stored(self):
         pass
 
     @abstractmethod
@@ -115,32 +118,46 @@ class MultibandTimeSeries(object):
         return self.n_bands
 
     @abstractmethod
-    def load_features(self):
+    def update(self):
         pass
 
     @abstractmethod
-    def interpolate(self):
+    def calculate_features(self):
+        pass
+
+    @abstractmethod
+    def calculate_period(self):
+        pass
+
+    @abstractmethod
+    def to_dict(self):
         pass
 
     @abstractmethod
     def fold(self):
         pass
 
-    @abstractmethod
-    def is_stored(self):
-        pass
-
-    @abstractmethod
-    def update(self):
-        pass
+    # @abstractmethod
+    # def interpolate(self):
+    #     pass
 
 
 class DataMultibandTimeSeries(MultibandTimeSeries):
+
+    @property
+    def id(self):
+        return self._id
+
     @property
     def period(self):
         if 'PeriodLS' in self.feature_dictionary:
             return self.feature_dictionary['PeriodLS']
-        ##TODO elif hay base de datos y está ahí entoces sacar de ahí else calcular con fats
+        if self.is_stored :
+            self.load_features_from_db()
+            db_period = self.feature_dictionary['PeriodLS']
+            if db_period is not None:
+                return db_period
+        return self.calculate_period()
 
     @property
     def feature_names(self):
@@ -152,19 +169,15 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
 
     @property
     def feature_dictionary(self):
-        return self._feature_dictionary
+        return dict(self._feature_dictionary)
 
-    @property
-    def is_interpolated(self):
-        pass
+    # @property
+    # def is_interpolated(self):
+    #     pass
 
-    @property
-    def is_folded(self):
-        pass
-
-    @property
-    def interpolation_resolution(self):
-        pass
+    # @property
+    # def interpolation_resolution(self):
+    #     pass
 
     @property
     def times(self):
@@ -177,7 +190,6 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
             result.append(band.values)
         return np.column_stack(result)
 
-
     @property
     def errors(self):
         result = []
@@ -185,24 +197,25 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
             result.append(band.errors)
         return np.column_stack(result)
 
+    # @property
+    # def interpolated_times(self):
+    #     pass
+    #
+    # @property
+    # def interpolated_values(self):
+    #     pass
 
     @property
-    def interpolated_times(self):
-        pass
+    def phase(self):
+        if self._phase is None:
+            self.fold()
+        return self._phase
 
     @property
-    def interpolated_values(self):
-        pass
+    def is_stored(self):
+        return self.database is not None
 
-    @property
-    def folded_phase(self):
-        pass
-
-    @property
-    def folded_values(self):
-        pass
-
-    def __init__(self, band_names, times, values, errors=None, id_=None, database=None):
+    def __init__(self, band_names, times, values, errors=None, phase=None, feature_dict={}):
         if values.ndim == 1:
             values = np.array(np.matrix(values).T)
         if errors is not None and errors.ndim == 1:
@@ -216,24 +229,25 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
             errors_dim_i, errors_dim_j = errors.shape
         if not (times_length == values_dim_i == errors_dim_i and values_dim_j == errors_dim_j == n_bands):
             raise ValueError('Dimensions in inputs must match')
-        self.bands = OrderedDict()
-        self.times = times
-        for band_name, i in zip(band_names, range(len(band_names))):
-            band_values = values[:,i]
-            if errors is None:
-                band_errors = None
-            else:
-                band_errors = errors[:,i]
-            self.bands[band_names] = TimeSeriesBand(band_values, band_errors)
-        self.is_interpolated = False
-        self.is_folded = False
-        self.id = id_
-        self.database = database
+        if errors is not None:
+            errors = np.array(errors)
+        if phase is not None:
+            phase = np.array(phase)
+        # self.is_interpolated = False
+        self._feature_dictionary = feature_dict
+        self._times = np.array(times)
+        self._errors = errors
+        self._phase = phase
+        self._phase = phase
+        self._id = None
+        self.database = None
+        self.band_names = band_names
 
     @staticmethod
-    def from_dictionary(dictionary):
-        times = np.array(dictionary['times'])
+    def from_dict(dictionary):
+        times = dictionary['times']
         bands = dictionary['bands']
+        phase = dictionary['phase']
         band_names = []
         values = []
         errors = []
@@ -247,39 +261,67 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
         values = np.column_stack(values)
         if errors is not None:
             errors = np.column_stack(errors)
-        return DataMultibandTimeSeries(band_names, times, values, errors)
+        features = dictionary['features']
+        time_series = DataMultibandTimeSeries(band_names, times, values, errors, phase, features)
+        return time_series
 
     def get_band(self, index_or_name):
         if type(index_or_name) is int:
-            return self.bands.values()[index_or_name]
+            index = index_or_name
+            band_name = self.band_names[index_or_name]
         else:
-            return self.bands[index_or_name]
-
+            index = self.band_names.index(index_or_name)
+            band_name = index_or_name
+        values = self.values[:, index]
+        if self.errors is None:
+            errors = None
+        else:
+            errors = self.errors[:, index]
+        return TimeSeriesBand(band_name, self, values, errors)
 
     def __getitem__(self, item):
         return super(MultibandTimeSeries, self).__getitem__(self, item)
 
     @property
     def n_bands(self):
-        return len(self.bands)
+        return len(self.band_names)
 
     def __len__(self):
         return self.n_bands
 
-    def load_features(self):
+    def update(self):
+        if self.is_stored:
+            self.database.update(self.id, self.to_dict())
+
+    def calculate_features(self):
         pass
 
-    def interpolate(self):
+    def calculate_period(self):
         pass
+
+    def load_features_from_db(self):
+        if self.database is not None:
+            self.features = self.database.get_features(self.id)
+
+    def load_period_from_db(self):
+        if self.database is not None:
+            self.features = self.database.get_features(self.id)
+
+    def to_dict(self):
+        dictionary = []
+        dictionary['times'] = list(self.times)
+        dictionary['phase'] = self._phase
+        values = []
+        errors = []
+        bands = {}
+        for band_name in self.band_names:
+            self
+        dictionary['features'] = self._feature_dictionary
+        dictionary['bands'] = band_name
 
     def fold(self):
-        pass
-
-    def is_stored(self):
-        pass
-
-    def update(self):
-        pass
+        t = self.period
+        self._phase = np.mod(self.times, t) / t
 
 
 class SyntheticTimeSeries(MultibandTimeSeries):
@@ -287,43 +329,50 @@ class SyntheticTimeSeries(MultibandTimeSeries):
 
 
 class TimeSeriesBand(object):
-
+    @property
+    def times(self):
+        return self.time_series.times
 
     @property
     def values(self):
-        pass
+        return self._values
+
+    @property
+    def period(self):
+        return self.time_series.period
 
     @property
     def errors(self):
-        pass
+        return self._errors
 
     @property
     def has_errors(self):
-        pass
+        return self._errors is not None
 
-    @property
-    def resolution(self):
-        pass
+    # @property
+    # def interpolated_values(self):
+    #     pass
 
-    @property
-    def interpolated_values(self):
-        pass
+    # @property
+    # def interpolation_resolution(self):
+    #     self.time_series.interpolation_resolution
 
-    @abstractproperty
-    def interpolation_resolution(self):
-        pass
+    def __init__(self, name, time_series, values, errors=None):
+        self.name = name
+        self._values = np.array(values)
+        if errors is None:
+            errors = np.array(errors)
+        self._errors = errors
+        self.time_series = time_series
+
+    def to_dict(self):
+        return {'values': self.values, 'errors': self.errors}
+
+    def to_array(self):
+        return np.column_stack((self.times, self.values, self.errors))
 
 
-    @abstractmethod
-    def __init__(self, values):
-        pass
 
-    @abstractmethod
-    def interpolate(self):
-        pass
 
-    @abstractmethod
-    def fold(self):
-        pass
 
 
