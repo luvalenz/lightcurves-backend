@@ -2,6 +2,7 @@ __author__ = 'lucas'
 
 from abc import ABCMeta, abstractmethod, abstractproperty
 import numpy as np
+import FATS
 
 
 class TimeSeriesDataBase(object):
@@ -154,9 +155,8 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
             return self.feature_dictionary['PeriodLS']
         if self.is_stored :
             self.load_features_from_db()
-            db_period = self.feature_dictionary['PeriodLS']
-            if db_period is not None:
-                return db_period
+            if 'PeriodLS' in self.feature_dictionary:
+                return self.feature_dictionary['PeriodLS']
         return self.calculate_period()
 
     @property
@@ -294,16 +294,12 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
             self.database.update(self.id, self.to_dict())
 
     def calculate_features(self):
-        pass
+        #TODO USE FATS
 
     def calculate_period(self):
-        pass
+        #TODO USE FATS
 
     def load_features_from_db(self):
-        if self.database is not None:
-            self.features = self.database.get_features(self.id)
-
-    def load_period_from_db(self):
         if self.database is not None:
             self.features = self.database.get_features(self.id)
 
