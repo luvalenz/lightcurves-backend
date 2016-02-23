@@ -3,17 +3,25 @@ __author__ = 'lucas'
 from abc import ABCMeta, abstractmethod, abstractproperty
 import numpy as np
 import FATS
+import os
+import pandas as pd
+import tarfile
+import sys
+if sys.version_info[0] < 3:
+    from StringIO import StringIO
+else:
+    from io import StringIO
 
 
 class TimeSeriesDataBase(object):
     __metaclass__ = ABCMeta
 
     @abstractmethod
-    def get_one(self, id_, original=True, phase=True, features=True):
+    def get_one(self, id_, original=True, phase=True, features=True, metadata=True):
         pass
 
     @abstractmethod
-    def get_many(self, id_list, original=True, phase=True, features=True):
+    def get_many(self, id_list, original=True, phase=True, features=True, metadata=True):
         pass
 
     @abstractmethod
@@ -31,8 +39,44 @@ class TimeSeriesDataBase(object):
         pass
 
 
-class TimeSeriesFileDataBase(TimeSeriesDataBase):
-    pass
+class MachoFileDataBase(TimeSeriesDataBase):
+
+    def __init__(self, light_curves_path, features_path):
+        self.light_curves_path = light_curves_path
+        self.features_path = features_path
+
+    def get_one(self, id_, original=True, phase=True, features=True, metadata=True):
+        field, tile, seq = id_.split('.')
+        tar_path = os.path.join(self.light_curves_path, 'F_{0}'.format(field), '{0}.tar'.format(tile))
+        tar = tarfile.open(tar_path)
+        band_names = ['B', 'R']
+        bands = {}
+        for band in bands:
+            band_path = 'F_{0}/{1}/lc_{2}.{3}.mjd'.format(field, tile, id_, band)
+            try:
+                light_curve_file_string = tar.extractfile(tar.getmember(band_path)).read()
+
+            except KeyError:
+                pass
+
+            return pd.read_csv(StringIO(light_curve_file_string), header=2, delimiter=' ')
+
+    def get_many(self, id_list, original=True, phase=True, features=True, metadata=True):
+        light_curves = []
+        for id_ in id_list:
+            light_curves.append(self.get_one(id_list), original, phase, features, metadata)
+        return light_curves
+
+    def get_features(self, id_):
+        pass
+
+    #can receive TimeSeries object or dict
+    def update(self, id_, updated_values):
+        pass
+
+    #can receive TimeSeries object or dict
+    def add(self, data):
+        pass
 
 
 class TimeSeriesMongoDataBase(TimeSeriesDataBase):
@@ -171,39 +215,17 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
     def feature_dictionary(self):
         return dict(self._feature_dictionary)
 
-    # @property
-    # def is_interpolated(self):
-    #     pass
-
-    # @property
-    # def interpolation_resolution(self):
-    #     pass
-
     @property
     def times(self):
-        return self.times
+        return self._times
 
     @property
     def values(self):
-        result = []
-        for band in self.bands:
-            result.append(band.values)
-        return np.column_stack(result)
+        return self._values
 
     @property
     def errors(self):
-        result = []
-        for band in self.bands:
-            result.append(band.errors)
-        return np.column_stack(result)
-
-    # @property
-    # def interpolated_times(self):
-    #     pass
-    #
-    # @property
-    # def interpolated_values(self):
-    #     pass
+        return self._errors
 
     @property
     def phase(self):
@@ -215,7 +237,15 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
     def is_stored(self):
         return self.database is not None
 
-    def __init__(self, band_names, times, values, errors=None, phase=None, feature_dict={}):
+    @property
+    def database(self):
+        return self._database
+
+    @property
+    def metadata(self):
+        return self._metadata
+
+    def __init__(self, band_names, times, values, errors=None, id_=None, phase=None, feature_dict={}, **kwargs):
         if values.ndim == 1:
             values = np.array(np.matrix(values).T)
         if errors is not None and errors.ndim == 1:
@@ -233,58 +263,69 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
             errors = np.array(errors)
         if phase is not None:
             phase = np.array(phase)
-        # self.is_interpolated = False
+        self._id = id_
         self._feature_dictionary = feature_dict
-        self._times = np.array(times)
-        self._errors = errors
         self._phase = phase
         self._phase = phase
         self._id = None
-        self.database = None
-        self.band_names = band_names
+        self._database = None
+        self._band_names = band_names
+        self._bands = {}
+        for i, band_name in zip(range(len(band_names)), band_names):
+            band_times = times[:, i]
+            band_values = values[:, i]
+            if errors is None:
+                band_errors = None
+            else:
+                band_errors = errors[:, i]
+            self._bands[band_name] = TimeSeriesBand(band_times, band_values, band_errors)
+        self._metadata = kwargs.copy()
 
     @staticmethod
     def from_dict(dictionary):
-        times = dictionary['times']
         bands = dictionary['bands']
-        phase = dictionary['phase']
+        id_ = dictionary['id']
         band_names = []
+        times = []
         values = []
         errors = []
+        phase = []
         for band in bands:
             band_names.append(band['band_names'])
+            times.append(band['times'])
             values.append(band['values'])
             if errors is not None and 'errors' in band and band['errors'] is not None:
                 errors.append(band['errors'])
             else:
                 errors = None
+            if phase is not None and 'phase' in band and band['phase'] is not None:
+                phase.append(band['phase'])
+            else:
+                phase = None
+        times = np.column_stack(times)
         values = np.column_stack(values)
         if errors is not None:
             errors = np.column_stack(errors)
+        if phase is not None:
+            phase = np.column_stack(phase)
         features = dictionary['features']
-        time_series = DataMultibandTimeSeries(band_names, times, values, errors, phase, features)
+        metadata = dictionary['metadata'].copy()
+        time_series = DataMultibandTimeSeries(band_names, times, values, errors, id_, phase, features, **metadata)
         return time_series
 
     def get_band(self, index_or_name):
         if type(index_or_name) is int:
-            index = index_or_name
-            band_name = self.band_names[index_or_name]
+            band_name = self._band_names[index_or_name]
         else:
-            index = self.band_names.index(index_or_name)
             band_name = index_or_name
-        values = self.values[:, index]
-        if self.errors is None:
-            errors = None
-        else:
-            errors = self.errors[:, index]
-        return TimeSeriesBand(band_name, self, values, errors)
+        return self._bands[band_name]
 
     def __getitem__(self, item):
         return super(MultibandTimeSeries, self).__getitem__(self, item)
 
     @property
     def n_bands(self):
-        return len(self.band_names)
+        return len(self._band_names)
 
     def __len__(self):
         return self.n_bands
@@ -294,26 +335,45 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
             self.database.update(self.id, self.to_dict())
 
     def calculate_features(self):
-        #TODO USE FATS
+        if self.n_bands == 1:
+            band = self.get_band(0)
+            [mag, time, error] = [band.values, band.times, band.errors]
+            [mag, time, error] = FATS.Preprocess_LC(mag, time, error).Preprocess()
+            feature_space = FATS.FeatureSpace(Data=['magnitude','time','error'], featureList=None)
+            self._feature_dictionary = feature_space.calculateFeature([mag, time, error]).result(method='dict')
+        else:
+            band1 = self.get_band(0)
+            band2 = self.get_band(1)
+            feature_space = FATS.FeatureSpace(Data='all', featureList=None)
+            [mag, time, error] = [band1.values, band1.times, band1.errors]
+            [mag2, time2, error2] = [band2.values, band2.times, band2.errors]
+            [mag, time, error] = FATS.Preprocess_LC(mag, time, error).Preprocess()
+            [mag2, time2, error2] = FATS.Preprocess_LC(mag2, time2, error2).Preprocess()
+            [aligned_mag, aligned_mag2, aligned_time, aligned_error, aligned_error2] = FATS.Align_LC(time, time2, mag, mag2, error, error2)
+            lc = [mag, time, error] + [aligned_mag, aligned_mag2, aligned_time, aligned_error, aligned_error2]
+            self._feature_dictionary = feature_space.calculateFeature(lc).result(method='dict')
 
     def calculate_period(self):
-        #TODO USE FATS
+            band = self.get_band(0)
+            [mag, time, error] = [band.values, self.times, band.errors]
+            preprocessed_data = FATS.Preprocess_LC(mag, time, error).Preprocess()
+            feature_space = FATS.FeatureSpace(Data=['magnitude','time','error'], featureList=['PeriodLS'])
+            features = feature_space.calculateFeature(preprocessed_data).result(method='dict')
+            self._feature_dictionary['PeriodLS'] = features['PeriodLS']
 
     def load_features_from_db(self):
         if self.database is not None:
-            self.features = self.database.get_features(self.id)
+            self._feature_dictionary = self.database.get_features(self.id)
 
     def to_dict(self):
         dictionary = []
-        dictionary['times'] = list(self.times)
-        dictionary['phase'] = self._phase
-        values = []
-        errors = []
         bands = {}
-        for band_name in self.band_names:
-            self
-        dictionary['features'] = self._feature_dictionary
-        dictionary['bands'] = band_name
+        for band_name in self._band_names:
+            band = self.get_band(band_name)
+            bands[band_name] = band.to_dict()
+        dictionary['features'] = self._feature_dictionary.copy()
+        dictionary['bands'] = bands
+        dictionary['metadata'] = self._metadata.copy()
 
     def fold(self):
         t = self.period
@@ -325,17 +385,18 @@ class SyntheticTimeSeries(MultibandTimeSeries):
 
 
 class TimeSeriesBand(object):
+
+    @property
+    def name(self):
+        return self._name
+
     @property
     def times(self):
-        return self.time_series.times
+        return self._times
 
     @property
     def values(self):
         return self._values
-
-    @property
-    def period(self):
-        return self.time_series.period
 
     @property
     def errors(self):
@@ -345,24 +406,23 @@ class TimeSeriesBand(object):
     def has_errors(self):
         return self._errors is not None
 
-    # @property
-    # def interpolated_values(self):
-    #     pass
+    @property
+    def phase(self):
+        return self._phase
 
-    # @property
-    # def interpolation_resolution(self):
-    #     self.time_series.interpolation_resolution
-
-    def __init__(self, name, time_series, values, errors=None):
-        self.name = name
+    def __init__(self, name, times, values, errors=None, phase=None):
+        self._name = name
+        self._times = times
         self._values = np.array(values)
         if errors is None:
             errors = np.array(errors)
+        if phase is None:
+            phase = np.array(phase)
         self._errors = errors
-        self.time_series = time_series
+        self._phase = phase
 
     def to_dict(self):
-        return {'values': self.values, 'errors': self.errors}
+        return {'times': self.times, 'values': self.values, 'errors': self.errors, 'phase': self._phase}
 
     def to_array(self):
         return np.column_stack((self.times, self.values, self.errors))
