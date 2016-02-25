@@ -11,6 +11,8 @@ if sys.version_info[0] < 3:
     from StringIO import StringIO
 else:
     from io import StringIO
+import pymongo
+from pymongo import MongoClient
 
 
 class TimeSeriesDataBase(object):
@@ -35,8 +37,13 @@ class TimeSeriesDataBase(object):
 
     #can receive TimeSeries object or dict
     @abstractmethod
-    def add(self, data):
+    def add_one(self, data):
         pass
+
+    @abstractmethod
+    def add_many(self, data):
+        pass
+
 
 
 class MachoFileDataBase(TimeSeriesDataBase):
@@ -104,13 +111,66 @@ class MachoFileDataBase(TimeSeriesDataBase):
         pass
 
     #can receive TimeSeries object or dict
-    def add(self, data):
+    def add_one(self, data):
         pass
 
+    #can receive TimeSeries object or dict
+    def add_many(self, data):
+        pass
 
 class TimeSeriesMongoDataBase(TimeSeriesDataBase):
-    pass
 
+    def __init__(self, url, port, db_name):
+        client = MongoClient(url, port)
+        self.db = client[db_name]
+
+    def setup(self):
+        collection_names = self.db.collection_names()
+        for collection_name in collection_names:
+            collection = self.db[collection_name]
+            collection.create_index([("id", pymongo.DESCENDING)], background=True)
+
+    def get_collection(self, catalog_name):
+        return self.db[catalog_name]
+
+    def get_one_dict(self, catalog_name, id_):
+        collection = self.db[catalog_name]
+        return collection.find_one({'id': id_})
+
+    def get_one(self, catalog, id_):
+        return DataMultibandTimeSeries.from_dict(self.get_one_dict(catalog, id_), self)
+
+    def get_many(self, collection, id_list):
+        return collection.find_one({'id': {'$in': id_list}})
+
+    def metadata_search(self, catalog_name, **kwargs):
+        query = []
+        for key, value in kwargs.iteritems():
+            query["metadata.{0}".format(key)] = value
+        collection = self.db[catalog_name]
+        return collection.find(query)
+
+    def get_features(self, id_):
+        return self.get_one_dict(id_)['features']
+
+    #can receive TimeSeries object or dict
+    def update(self, catalog_name, id_, updated_datum):
+        collection = self.db[catalog_name]
+        if not isinstance(updated_datum, dict):
+            updated_datum = updated_datum.to_dict()
+        collection.update_one({'id':id_}, updated_datum)
+
+    #can receive TimeSeries object or dict
+    def add_one(self, catalog_name, datum):
+        collection = self.db[catalog_name]
+        if not isinstance(datum, dict):
+            datum = datum.to_dict()
+        collection.insert_one(datum)
+
+    def add_many(self, catalog_name, data):
+        collection = self.db[catalog_name]
+        data = [datum if isinstance(datum, dict) else datum.to_dict() for datum in data]
+        collection.insert_many(data)
 
 class MultibandTimeSeries(object):
     __metaclass__ = ABCMeta
