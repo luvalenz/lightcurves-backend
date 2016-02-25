@@ -76,7 +76,7 @@ class MachoFileDataBase(TimeSeriesDataBase):
     def _get_metadata_dict(field, tile, seq, file_string):
         metadata_string = file_string.split('\n')[1]
         ra, dec = [float(s) for s in metadata_string.split()[3:5]]
-        return {'field': field, 'tile': tile, 'seq': seq, 'ra': ra, 'dec': dec}
+        return {'field': field, 'tile': tile, 'seq': seq, 'ra': ra, 'dec': dec, 'catalog': 'macho'}
 
     @staticmethod
     def _get_band_dict(data_frame):
@@ -143,14 +143,6 @@ class MultibandTimeSeries(object):
     def feature_dict(self):
         pass
 
-    # @abstractproperty
-    # def is_interpolated(self):
-    #     pass
-
-    # @abstractproperty
-    # def interpolation_resolution(self):
-    #     pass
-
     @abstractproperty
     def times(self):
         pass
@@ -163,20 +155,8 @@ class MultibandTimeSeries(object):
     def errors(self):
         pass
 
-    # @abstractproperty
-    # def interpolated_time(self):
-    #     pass
-
-    # @abstractproperty
-    # def interpolated_values(self):
-    #     pass
-
     @abstractproperty
     def phase(self):
-        pass
-
-    @abstractproperty
-    def is_stored(self):
         pass
 
     @abstractmethod
@@ -294,14 +274,6 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
         return result
 
     @property
-    def is_stored(self):
-        return self.database is not None
-
-    @property
-    def database(self):
-        return self._database
-
-    @property
     def metadata(self):
         return self._metadata
 
@@ -309,7 +281,7 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
     def is_folded(self):
         return self._is_folded
 
-    def __init__(self, band_names, times, values, errors=None, id_=None, phase=None, feature_dict={}, database=None, **kwargs):
+    def __init__(self, band_names, times, values, errors=None, id_=None, phase=None, feature_dict={}, **kwargs):
         n_bands_match = len(band_names) == len(times) == len(values)
         if errors is not None:
             n_bands_match = n_bands_match and len(band_names) == len(errors)
@@ -330,7 +302,6 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
         self._id = id_
         self._bands_dict = {}
         self._is_folded = phase is not None
-        self._database = database
         self._band_names = sorted(band_names)
         for i, band_name in zip(range(len(band_names)), band_names):
             band_times = times[i]
@@ -348,7 +319,7 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
         self._metadata = kwargs.copy()
 
     @staticmethod
-    def from_dict(dictionary, database=None):
+    def from_dict(dictionary):
         bands_dict = dictionary['bands']
         id_ = dictionary['id']
         times = []
@@ -370,7 +341,7 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
                 phase = None
         features = dictionary['features']
         metadata = dictionary['metadata']
-        time_series = DataMultibandTimeSeries(band_names, times, values, errors, id_, phase, features, database, **metadata)
+        time_series = DataMultibandTimeSeries(band_names, times, values, errors, id_, phase, features, **metadata)
         return time_series
 
     def get_band(self, index_or_name):
@@ -389,10 +360,6 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
 
     def __len__(self):
         return self.n_bands
-
-    def update(self):
-        if self.is_stored:
-            self.database.update(self.id, self.to_dict())
 
     def calculate_features(self):
         if self.n_bands == 1:
@@ -421,9 +388,8 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
             features = feature_space.calculateFeature(preprocessed_data).result(method='dict')
             self._feature_dictionary['PeriodLS'] = features['PeriodLS']
 
-    def load_features_from_db(self):
-        if self.database is not None:
-            self._feature_dictionary = self.database.get_features(self.id)
+    def load_features_from_db(self, database):
+            self._feature_dictionary = database.get_features(self.id)
 
     def to_dict(self):
         dictionary = []
