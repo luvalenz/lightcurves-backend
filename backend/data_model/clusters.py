@@ -19,8 +19,7 @@ class ClustersDataBase:
         pass
 
     @abstractmethod
-    def __init__(self, time_series_db):
-        self.time_series_db = time_series_db
+    def __init__(self):
 
     @abstractmethod
     def store_clusters(self):
@@ -31,11 +30,11 @@ class ClustersDataBase:
         pass
 
     @abstractproperty
-    def centers(self, cluster_index):
+    def get_center(self, cluster_index):
         pass
 
     @abstractmethod
-    def numbers_of_data(self, cluster_index):
+    def get_number_of_data(self, cluster_index):
         pass
 
     @abstractmethod
@@ -51,16 +50,49 @@ class ClustersDataBase:
         pass
 
 
-class ClustersFileDataBase:
-    pass
-
-
 class ClustersMongoDataBase:
-    pass
+    __metaclass__ = ABCMeta
+
+    @property
+    def radii(self):
+        pass
+
+    @property
+    def centers(self):
+        pass
+
+    def numbers_of_data(self):
+        pass
+
+    def __init__(self):
+
+    def store_clusters(self, clusters_list):
+        if len(self.db.collection_names()) != 0:
+            return
+
+
+    def get_radius(self, cluster_index):
+        pass
+
+    def get_center(self, cluster_index):
+        pass
+
+    def get_number_of_data(self, cluster_index):
+        pass
+
+    def get_data(self, cluster_index):
+        pass
+
+    def get_data_indices(self, cluster_index):
+        pass
+
+    @abstractmethod
+    def get_cluster(self, cluster_index):
+        pass
+
 
 
 class Cluster:
-
 
     @property
     def radius(self):
@@ -79,6 +111,9 @@ class Cluster:
 
     @staticmethod
     def from_pandas_data_frame(data_frame, center):
+        pass
+
+    def to_dict(self):
         pass
 
 
