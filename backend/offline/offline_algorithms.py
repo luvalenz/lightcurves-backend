@@ -7,6 +7,7 @@ import pandas as pd
 import scipy.spatial.distance as dist
 import os
 import pickle
+import operator
 
 #python 2
 
@@ -63,7 +64,6 @@ class Birch(Picklable, IncrementalClustering):
         self.root = BirchNode(self, True)
         self._labels = None
         self._global_labels = None
-        self.n_data = 0
         self.n_global_clusters = n_global_clusters
 
     @property
@@ -75,11 +75,11 @@ class Birch(Picklable, IncrementalClustering):
         return self._global_labels is not None
 
     @property
-    def n_data(self):
+    def count(self):
         cfs = self.root._clustering_features
         result = 0
         for cf in cfs:
-            result += cf.n_data
+            result += cf.count
         return result
 
     @property
@@ -98,7 +98,7 @@ class Birch(Picklable, IncrementalClustering):
     def centers(self):
         if not self.has_labels:
             self.generate_labels()
-        return (self._linear_sums.T / self._ns_data).T
+        return (self._linear_sums.T / self._counts).T
 
     @property
     def squared_norms(self):
@@ -113,10 +113,10 @@ class Birch(Picklable, IncrementalClustering):
         return self._linear_sums
 
     @property
-    def ns_data(self):
+    def counts(self):
         if not self.has_labels:
             self.generate_labels()
-        return self._ns_data
+        return self._counts
 
     @property
     def global_labels(self):
@@ -192,27 +192,27 @@ class Birch(Picklable, IncrementalClustering):
         clusters = self.root.get_clusters()
         labels = np.empty((0,2))
         next_label = 0
-        ns_data = []
+        counts = []
         squared_norms = []
         linear_sums = []
         for cluster in clusters:
             indices = cluster.get_indices()
-            ns_data.append(cluster.n_data)
+            counts.append(cluster.count)
             squared_norms.append(cluster.squared_norm)
             linear_sums.append(cluster.linear_sum)
             cluster_labels = np.column_stack((indices, next_label*np.ones(len(indices))))
             labels = np.vstack((labels, cluster_labels))
             next_label += 1
         self._labels = labels
-        self._ns_data = np.array(ns_data)
+        self._counts = np.array(counts)
         self._linear_sums = np.vstack(linear_sums)
         self.squared_norms = np.array(squared_norms)
 
     def do_global_clustering(self):
-        ns_data = self.ns_data
+        counts = self.counts
         linear_sums = self.linear_sums
         squared_norms = self.squared_norms
-        n_clusters = len(ns_data)
+        n_clusters = len(counts)
         distances = []
         indices_dict = {}
         for i in range(n_clusters):
@@ -220,7 +220,7 @@ class Birch(Picklable, IncrementalClustering):
         for i, j in itertools.product(range(n_clusters), repeat=2):
             distance = np.inf
             if i < j:
-                distance = self.d2(ns_data[i], linear_sums[i], squared_norms[i], ns_data[j], linear_sums[j], squared_norms[j])
+                distance = self.d2(counts[i], linear_sums[i], squared_norms[i], counts[j], linear_sums[j], squared_norms[j])
             distances.append(distance)
         distances = np.array(distances)
         n_global_clusters = n_clusters
@@ -243,9 +243,9 @@ class Birch(Picklable, IncrementalClustering):
                         index_j = min_j*n_clusters + k
                     distance_i = distances[index_i]
                     distance_j = distances[index_j]
-                    n_data_i = ns_data[min_i]
-                    n_data_j = ns_data[min_j]
-                    new_distance = np.sqrt((n_data_i*distance_i**2 + n_data_j*distance_j**2)/(n_data_i + n_data_j))
+                    count_i = counts[min_i]
+                    count_j = counts[min_j]
+                    new_distance = np.sqrt((count_i*distance_i**2 + count_j*distance_j**2)/(count_i + count_j))
                     distances[index_i] = new_distance
                     j_indices.append(index_j)
             distances[j_indices] = np.inf
@@ -254,14 +254,13 @@ class Birch(Picklable, IncrementalClustering):
         self._build_global_clusters(indices_list)
 
     def _build_global_clusters(self, indices_list):
-        #TODO BUILD CENTERS
         global_centers = []
         global_labels = []
         next_global_label = 0
         for cluster_indices in indices_list:
             linear_sum = np.sum(self.linear_sums[cluster_indices], axis=0)
-            n_data = np.sum(self.ns_data[cluster_indices])
-            center = linear_sum / n_data
+            count = np.sum(self.counts[cluster_indices])
+            center = linear_sum / count
             global_centers.append(center)
             index_mask = []
             for index in cluster_indices:
@@ -275,25 +274,24 @@ class Birch(Picklable, IncrementalClustering):
         self._global_centers = np.vstack(global_centers)
         self._global_labels = np.vstack(global_labels)
 
+    def violates_threshold(self, count, linear_sum, squared_norm):
+        return self.cluster_size(count, linear_sum, squared_norm) >= self.threshold
 
-    def violates_threshold(self, n_data, linear_sum, squared_norm):
-        return self.cluster_size(n_data, linear_sum, squared_norm) >= self.threshold
-
-    def cluster_size(self, n_data, linear_sum, squared_norm):
+    def cluster_size(self, count, linear_sum, squared_norm):
         if self.cluster_size_measure == 'd':
-            return Birch.diameter(n_data, linear_sum, squared_norm)
+            return Birch.diameter(count, linear_sum, squared_norm)
         else:
-            return Birch.radius(n_data, linear_sum, squared_norm)
+            return Birch.radius(count, linear_sum, squared_norm)
 
-    def cluster_distance(self, n_data_1, linear_sum_1, squared_norm1, n_data_2, linear_sum_2, squared_norm2):
+    def cluster_distance(self, count_1, linear_sum_1, squared_norm1, count_2, linear_sum_2, squared_norm2):
         if self.cluster_distance_measure == 'd1':
-            return Birch.d1(n_data_1, linear_sum_1, squared_norm1, n_data_2, linear_sum_2, squared_norm2)
+            return Birch.d1(count_1, linear_sum_1, squared_norm1, count_2, linear_sum_2, squared_norm2)
         elif self.cluster_distance_measure == 'd2':
-            return Birch.d2(n_data_1, linear_sum_1, squared_norm1, n_data_2, linear_sum_2, squared_norm2)
+            return Birch.d2(count_1, linear_sum_1, squared_norm1, count_2, linear_sum_2, squared_norm2)
         elif self.cluster_distance_measure == 'd3':
-            return Birch.d3(n_data_1, linear_sum_1, squared_norm1, n_data_2, linear_sum_2, squared_norm2)
+            return Birch.d3(count_1, linear_sum_1, squared_norm1, count_2, linear_sum_2, squared_norm2)
         else:
-            return Birch.d0(n_data_1, linear_sum_1, squared_norm1, n_data_2, linear_sum_2, squared_norm2)
+            return Birch.d0(count_1, linear_sum_1, squared_norm1, count_2, linear_sum_2, squared_norm2)
 
     def add_pandas_data_frame(self, data_frame):
         self._labels = None
@@ -314,55 +312,55 @@ class Birch(Picklable, IncrementalClustering):
         self.root.add(index, data_point_cf)
 
     @staticmethod
-    def to_float(n_data, linear_sum, squared_norm):
-        return float(n_data), linear_sum.astype(np.float32), squared_norm.astype(np.float32)
+    def to_float(count, linear_sum, squared_norm):
+        return float(count), linear_sum.astype(np.float32), squared_norm.astype(np.float32)
 
     @staticmethod
-    def radius(n_data, linear_sum, squared_norm):
-        n_data, linear_sum, squared_norm = Birch.to_float(n_data, linear_sum, squared_norm)
-        centroid = linear_sum/n_data
-        result = np.sqrt(squared_norm/n_data - np.linalg.norm(centroid)**2)
+    def radius(count, linear_sum, squared_norm):
+        count, linear_sum, squared_norm = Birch.to_float(count, linear_sum, squared_norm)
+        centroid = linear_sum/count
+        result = np.sqrt(squared_norm/count - np.linalg.norm(centroid)**2)
         return result
 
     @staticmethod
-    def diameter(n_data, linear_sum, squared_norm):
-        n_data, linear_sum, squared_norm = Birch.to_float(n_data, linear_sum, squared_norm)
-        return np.sqrt(2)*Birch.radius(n_data, linear_sum, squared_norm)
+    def diameter(count, linear_sum, squared_norm):
+        count, linear_sum, squared_norm = Birch.to_float(count, linear_sum, squared_norm)
+        return np.sqrt(2)*Birch.radius(count, linear_sum, squared_norm)
 
     @staticmethod
-    def d0(n_data_1, linear_sum_1, squared_norm_1, n_data_2, linear_sum_2, squared_norm_2):
-        n_data_1, linear_sum_1, squared_norm_1 = Birch.to_float(n_data_1, linear_sum_1, squared_norm_1)
-        n_data_2, linear_sum_2, squared_norm_2 = Birch.to_float(n_data_2, linear_sum_2, squared_norm_2)
-        centroid_1 = linear_sum_1/n_data_1
-        centroid_2 = linear_sum_2/n_data_2
+    def d0(count_1, linear_sum_1, squared_norm_1, count_2, linear_sum_2, squared_norm_2):
+        count_1, linear_sum_1, squared_norm_1 = Birch.to_float(count_1, linear_sum_1, squared_norm_1)
+        count_2, linear_sum_2, squared_norm_2 = Birch.to_float(count_2, linear_sum_2, squared_norm_2)
+        centroid_1 = linear_sum_1/count_1
+        centroid_2 = linear_sum_2/count_2
         return np.linalg.norm(centroid_1-centroid_2)**2
 
     @staticmethod
-    def d1(n_data_1, linear_sum_1, squared_norm_1, n_data_2, linear_sum_2, squared_norm_2):
-        n_data_1, linear_sum_1, squared_norm_1 = Birch.to_float(n_data_1, linear_sum_1, squared_norm_1)
-        n_data_2, linear_sum_2, squared_norm_2 = Birch.to_float(n_data_2, linear_sum_2, squared_norm_2)
-        centroid_1 = linear_sum_1/n_data_1
-        centroid_2 = linear_sum_2/n_data_2
+    def d1(count_1, linear_sum_1, squared_norm_1, count_2, linear_sum_2, squared_norm_2):
+        count_1, linear_sum_1, squared_norm_1 = Birch.to_float(count_1, linear_sum_1, squared_norm_1)
+        count_2, linear_sum_2, squared_norm_2 = Birch.to_float(count_2, linear_sum_2, squared_norm_2)
+        centroid_1 = linear_sum_1/count_1
+        centroid_2 = linear_sum_2/count_2
         return np.sum(np.abs(centroid_1-centroid_2))
 
     @staticmethod
-    def d2(n_data_1, linear_sum_1, squared_norm1, n_data_2, linear_sum_2, squared_norm2):
-        return np.sqrt(squared_norm1/n_data_1 + squared_norm2/n_data_2 - 2*np.dot(linear_sum_1, linear_sum_2)/n_data_1/n_data_2)
+    def d2(count_1, linear_sum_1, squared_norm1, count_2, linear_sum_2, squared_norm2):
+        return np.sqrt(squared_norm1/count_1 + squared_norm2/count_2 - 2*np.dot(linear_sum_1, linear_sum_2)/count_1/count_2)
 
     @staticmethod
-    def d3(n_data_1, linear_sum_1, squared_norm_1, n_data_2, linear_sum_2, squared_norm_2):
-        n_data_1, linear_sum_1, squared_norm_1 = Birch.to_float(n_data_1, linear_sum_1, squared_norm_1)
-        n_data_2, linear_sum_2, squared_norm_2 = Birch.to_float(n_data_2, linear_sum_2, squared_norm_2)
-        return Birch.diameter(n_data_1+n_data_2,linear_sum_1+linear_sum_2,squared_norm_1+squared_norm_2)
+    def d3(count_1, linear_sum_1, squared_norm_1, count_2, linear_sum_2, squared_norm_2):
+        count_1, linear_sum_1, squared_norm_1 = Birch.to_float(count_1, linear_sum_1, squared_norm_1)
+        count_2, linear_sum_2, squared_norm_2 = Birch.to_float(count_2, linear_sum_2, squared_norm_2)
+        return Birch.diameter(count_1+count_2,linear_sum_1+linear_sum_2,squared_norm_1+squared_norm_2)
 
     @staticmethod
-    def d4(n_data_1, linear_sum_1, squared_norm1, n_data_2, linear_sum_2, squared_norm2):
-        n_data = n_data_1 + n_data_2
+    def d4(count_1, linear_sum_1, squared_norm1, count_2, linear_sum_2, squared_norm2):
+        count = count_1 + count_2
         ss = squared_norm1 + squared_norm2
         ls = linear_sum_1 + linear_sum_2
-        result_merged = n_data * Birch.radius(n_data, ls, ss)**2
-        result_1 = n_data_1 * Birch.radius(n_data_1, linear_sum_1, squared_norm1)**2
-        result_2 = n_data_2 * Birch.radius(n_data_2, linear_sum_2, squared_norm2)**2
+        result_merged = count * Birch.radius(count, ls, ss)**2
+        result_1 = count_1 * Birch.radius(count_1, linear_sum_1, squared_norm1)**2
+        result_2 = count_2 * Birch.radius(count_2, linear_sum_2, squared_norm2)**2
         result = result_merged - result_1 - result_2
         return result
 
@@ -394,14 +392,14 @@ class BirchNode:
 
     @property
     def cf_sum(self):
-        n_data_sum = 0
+        count_sum = 0
         linear_sum_sum = 0
         squared_norm_sum = 0
         for cf in self._clustering_features:
-            n_data_sum += cf.n_data
+            count_sum += cf.count
             linear_sum_sum += cf.linear_sum
             squared_norm_sum += cf.squared_norm
-        return n_data_sum, linear_sum_sum, squared_norm_sum
+        return count_sum, linear_sum_sum, squared_norm_sum
 
     @property
     def is_root(self):
@@ -440,7 +438,7 @@ class BirchNode:
         self._clustering_features.append(cf)
         cf.node = self
         if not self.is_root and not cf.is_empty:
-            self.cf_parent.update(cf.n_data, cf.linear_sum, cf.squared_norm)
+            self.cf_parent.update(cf.count, cf.linear_sum, cf.squared_norm)
 
 
     #returns tuple with center and indices of leaf clusters
@@ -477,7 +475,7 @@ class BirchNode:
         for cf1 in cfs:
             j = i + 1
             for cf2 in cfs[j:]:
-                distances[(i, j)] = self.birch.cluster_distance(cf1.n_data, cf1.linear_sum, cf1.squared_norm, cf2.n_data, cf2.linear_sum, cf2.squared_norm)
+                distances[(i, j)] = self.birch.cluster_distance(cf1.count, cf1.linear_sum, cf1.squared_norm, cf2.count, cf2.linear_sum, cf2.squared_norm)
                 j += 1
             i += 1
         seeds_indices = min(distances.iteritems(), key=operator.itemgetter(1))[0]
@@ -506,7 +504,7 @@ class BirchNode:
         for cf1 in cfs:
             j = i + 1
             for cf2 in cfs[j:]:
-                distances[(i, j)] = self.birch.cluster_distance(cf1.n_data, cf1.linear_sum, cf1.squared_norm, cf2.n_data, cf2.linear_sum, cf2.squared_norm)
+                distances[(i, j)] = self.birch.cluster_distance(cf1.count, cf1.linear_sum, cf1.squared_norm, cf2.count, cf2.linear_sum, cf2.squared_norm)
                 j += 1
             i += 1
         seeds_indices = max(distances.iteritems(), key=operator.itemgetter(1))[0]
@@ -519,8 +517,8 @@ class BirchNode:
         new_nodes = [new_node0, new_node1]
         while len(cfs) != 0:
             next_cf = cfs[0]
-            dist0 = self.birch.cluster_distance(new_cf0.n_data, new_cf0.linear_sum, new_cf0.squared_norm, next_cf.n_data, next_cf.linear_sum, next_cf.squared_norm)
-            dist1 = self.birch.cluster_distance(new_cf1.n_data, new_cf1.linear_sum, new_cf1.squared_norm, next_cf.n_data, next_cf.linear_sum, next_cf.squared_norm)
+            dist0 = self.birch.cluster_distance(new_cf0.count, new_cf0.linear_sum, new_cf0.squared_norm, next_cf.count, next_cf.linear_sum, next_cf.squared_norm)
+            dist1 = self.birch.cluster_distance(new_cf1.count, new_cf1.linear_sum, new_cf1.squared_norm, next_cf.count, next_cf.linear_sum, next_cf.squared_norm)
             closest_node, furthest_node = [new_nodes[i] for i in np.argsort([dist0, dist1])]
             if closest_node.is_full:
                 furthest_node.add_clustering_feature(next_cf)
@@ -549,11 +547,11 @@ class ClusteringFeature:
 
     __metaclass__ = ABCMeta
 
-    def __init__(self, birch, n_data, linear_sum, squared_norm):
+    def __init__(self, birch, count, linear_sum, squared_norm):
         self.birch = birch
         self.linear_sum = linear_sum
         self.squared_norm = squared_norm
-        self.n_data = n_data
+        self.count = count
         self.node = None
         global number
         self.number = number
@@ -568,22 +566,22 @@ class ClusteringFeature:
 
     @property
     def is_empty(self):
-        return self.n_data == 0
+        return self.count == 0
 
     @property
     def centroid(self):
-        return self.linear_sum / self.n_data
+        return self.linear_sum / self.count
 
 
-    def update(self, n_data_increment, linear_sum_increment, squared_norm_increment):
+    def update(self, count_increment, linear_sum_increment, squared_norm_increment):
         self.linear_sum += linear_sum_increment
         self.squared_norm += squared_norm_increment
-        self.n_data += n_data_increment
+        self.count += count_increment
         if self.cf_parent is not None:
-            self.cf_parent.update(n_data_increment, linear_sum_increment, squared_norm_increment)
+            self.cf_parent.update(count_increment, linear_sum_increment, squared_norm_increment)
 
-    def distance(self, n_data, linear_sum, squared_norm):
-        return self.birch.cluster_distance(self.n_data, self.linear_sum, self.squared_norm, n_data, linear_sum, squared_norm)
+    def distance(self, count, linear_sum, squared_norm):
+        return self.birch.cluster_distance(self.count, self.linear_sum, self.squared_norm, count, linear_sum, squared_norm)
 
     @abstractmethod
     def can_add(self, index, data_point_cf):
@@ -604,8 +602,8 @@ class LeafClusteringFeature(ClusteringFeature):
         data_point, squared_norm = data_point_cf
         new_linear_sum = self.linear_sum + data_point
         new_squared_norm = self.squared_norm + squared_norm
-        new_n_data = self.n_data + 1
-        if not self.birch.violates_threshold(new_n_data, new_linear_sum, new_squared_norm):
+        new_count = self.count + 1
+        if not self.birch.violates_threshold(new_count, new_linear_sum, new_squared_norm):
             return True
         return False
 
@@ -621,16 +619,16 @@ class LeafClusteringFeature(ClusteringFeature):
 class NonLeafClusteringFeature(ClusteringFeature):
 
     def __init__(self, birch, child_node):
-        n_data = 0
+        count = 0
         linear_sum = 0
         squared_norm = 0
-        super(NonLeafClusteringFeature, self).__init__(birch, n_data, linear_sum, squared_norm)
+        super(NonLeafClusteringFeature, self).__init__(birch, count, linear_sum, squared_norm)
         self.set_child(child_node)
 
     def set_child(self, child_node):
         self.child = child_node
         child_node.cf_parent = self
-        self.n_data, self.linear_sum, self.squared_norm = child_node.cf_sum
+        self.count, self.linear_sum, self.squared_norm = child_node.cf_sum
 
 
     def can_add(self, index, data_point):

@@ -13,6 +13,7 @@ else:
     from io import StringIO
 import pymongo
 from pymongo import MongoClient
+import glob
 
 
 class TimeSeriesDataBase(object):
@@ -44,6 +45,13 @@ class TimeSeriesDataBase(object):
     def add_many(self, data):
         pass
 
+    @abstractmethod
+    def delete_one(self, catalog, id_):
+        pass
+
+    @abstractmethod
+    def delete_catalog(self, catalog):
+        pass
 
 
 class MachoFileDataBase(TimeSeriesDataBase):
@@ -77,7 +85,45 @@ class MachoFileDataBase(TimeSeriesDataBase):
         return {'bands': bands_dict, 'features': features_dict, 'metadata': metadata_dict, 'id': id_}
 
     def get_one(self, id_, original=True, phase=False, features=True, metadata=True):
-        return DataMultibandTimeSeries.from_dict(self.get_one_dict(id_, original, phase, features, metadata), self)
+        return DataMultibandTimeSeries.from_dict(self.get_one_dict(id_, original, phase, features, metadata))
+
+    def get_many_dict(self, field, tile, original=True, phase=False, features=True, metadata=True):
+        tar_path = os.path.join(self.light_curves_path, 'F_{0}'.format(field), '{0}.tar'.format(tile))
+        tar = tarfile.open(tar_path)
+        paths = tar.getnames()
+        ids = [path.split('_')[-1][:-6] for path in paths if path.endswith('.mjd')]
+        band_names = ['B', 'R']
+        bands_dict = {}
+        metadata_dict = None
+        list_of_dicts = []
+        for id_ in ids:
+            seq = id_.split('.')[-1]
+            for band_name in band_names:
+                band_path = 'F_{0}/{1}/lc_{2}.{3}.mjd'.format(field, tile, id_, band_name)
+                try:
+                    light_curve_file_string = tar.extractfile(tar.getmember(band_path)).read()
+                    if metadata and metadata_dict is None :
+                        metadata_dict = MachoFileDataBase._get_metadata_dict(field, tile, seq, light_curve_file_string)
+                    if original:
+                        band_data_frame = pd.read_csv(StringIO(light_curve_file_string), header=2, delimiter=' ')
+                        this_band_dict = MachoFileDataBase._get_band_dict(band_data_frame)
+                        bands_dict[band_name] = this_band_dict
+                except KeyError:
+                    pass
+            features_dict = {}
+            if features:
+                features_dict = self.get_features(id_)
+            list_of_dicts.append({'bands': bands_dict, 'features': features_dict, 'metadata': metadata_dict, 'id': id_})
+        return list_of_dicts
+
+    def get_many(self, field, tile, original=True, phase=False, features=True, metadata=True):
+        list_of_dicts = self.get_many_dict(field, tile, original, phase, features, metadata)
+        print(len(list_of_dicts))
+        list_of_time_series = []
+        for dictionary in list_of_dicts:
+            list_of_time_series.append(DataMultibandTimeSeries.from_dict(dictionary))
+        return list_of_time_series
+
 
     @staticmethod
     def _get_metadata_dict(field, tile, seq, file_string):
@@ -89,12 +135,6 @@ class MachoFileDataBase(TimeSeriesDataBase):
     def _get_band_dict(data_frame):
         times, values, errors = data_frame.values.T
         return {'times': list(times), 'values': list(values), 'errors': list(errors)}
-
-    def get_many(self, id_list, original=True, phase=True, features=True, metadata=True):
-        light_curves = []
-        for id_ in id_list:
-            light_curves.append(self.get_one(id_list), original, phase, features, metadata)
-        return light_curves
 
     def get_features(self, id_):
         try:
@@ -118,17 +158,32 @@ class MachoFileDataBase(TimeSeriesDataBase):
     def add_many(self, data):
         pass
 
+    def delete_one(self, catalog, id_):
+        pass
+
+    def delete_catalog(self, catalog):
+        pass
+
+    def get_tiles_in_field(self, field):
+        field_path = os.path.join(self.light_curves_path, 'F_{0}'.format(field))
+        tars = glob.glob(os.path.join(field_path, '*.tar'))
+        return [int(os.path.basename(file_name).split('.')[0]) for file_name in tars]
+
+
+
 class TimeSeriesMongoDataBase(TimeSeriesDataBase):
 
     def __init__(self, url, port, db_name):
         client = MongoClient(url, port)
         self.db = client[db_name]
 
-    def setup(self):
-        collection_names = self.db.collection_names()
+    def setup(self, collection_names = []):
+        existing_collection_names = self.db.collection_names()
+        collection_names = list(set(existing_collection_names + collection_names))
+        collection_names.remove('system.indexes')
         for collection_name in collection_names:
             collection = self.db[collection_name]
-            collection.create_index([("id", pymongo.DESCENDING)], background=True)
+            collection.create_index([("id", pymongo.ASCENDING)], background=True)
 
     def get_collection(self, catalog_name):
         return self.db[catalog_name]
@@ -138,10 +193,15 @@ class TimeSeriesMongoDataBase(TimeSeriesDataBase):
         return collection.find_one({'id': id_})
 
     def get_one(self, catalog, id_):
-        return DataMultibandTimeSeries.from_dict(self.get_one_dict(catalog, id_), self)
+        return DataMultibandTimeSeries.from_dict(self.get_one_dict(catalog, id_))
 
-    def get_many(self, collection, id_list):
-        return collection.find_one({'id': {'$in': id_list}})
+    def get_many(self, catalog_name, id_list):
+        collection = self.db[catalog_name]
+        cursor = collection.find({'id': {'$in': id_list}})
+        time_series_list = []
+        for document in cursor:
+            time_series_list.append(DataMultibandTimeSeries.from_dict(document))
+        return time_series_list
 
     def metadata_search(self, catalog_name, **kwargs):
         query = []
@@ -150,15 +210,15 @@ class TimeSeriesMongoDataBase(TimeSeriesDataBase):
         collection = self.db[catalog_name]
         return collection.find(query)
 
-    def get_features(self, id_):
-        return self.get_one_dict(id_)['features']
+    def get_features(self, catalog_name, id_):
+        return self.get_one_dict(catalog_name, id_)['features']
 
     #can receive TimeSeries object or dict
     def update(self, catalog_name, id_, updated_datum):
         collection = self.db[catalog_name]
         if not isinstance(updated_datum, dict):
             updated_datum = updated_datum.to_dict()
-        collection.update_one({'id':id_}, updated_datum)
+        collection.replace_one({'id':id_}, updated_datum)
 
     #can receive TimeSeries object or dict
     def add_one(self, catalog_name, datum):
@@ -171,6 +231,14 @@ class TimeSeriesMongoDataBase(TimeSeriesDataBase):
         collection = self.db[catalog_name]
         data = [datum if isinstance(datum, dict) else datum.to_dict() for datum in data]
         collection.insert_many(data)
+
+    def delete_one(self, catalog_name, id_):
+        collection = self.db[catalog_name]
+        collection.delete_one({'id': id_})
+
+    def delete_catalog(self, catalog_name):
+        self.db[catalog_name].drop()
+
 
 class MultibandTimeSeries(object):
     __metaclass__ = ABCMeta
@@ -238,10 +306,6 @@ class MultibandTimeSeries(object):
     @abstractmethod
     def __len__(self):
         return self.n_bands
-
-    @abstractmethod
-    def update(self):
-        pass
 
     @abstractmethod
     def calculate_features(self):
@@ -358,7 +422,7 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
             if not inputs_match:
                 raise ValueError('Number of entries in time and values must match. Errors and Phase must also match if any.')
         self._id = id_
-        self._feature_dictionary = feature_dict
+        self._feature_dictionary = feature_dict.copy()
         self._id = id_
         self._bands_dict = {}
         self._is_folded = phase is not None
@@ -452,7 +516,7 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
             self._feature_dictionary = database.get_features(self.id)
 
     def to_dict(self):
-        dictionary = []
+        dictionary = {}
         bands = {}
         for band_name in self._band_names:
             band = self.get_band(band_name)
@@ -538,7 +602,11 @@ class TimeSeriesBand(object):
         self._phase = np.mod(self.times, t) / t
 
     def to_dict(self):
-        return {'times': self.times, 'values': self.values, 'errors': self.errors, 'phase': self._phase}
+        times = self.times.tolist()
+        values = self.values.tolist()
+        errors = self.errors.tolist() if self.errors is not None else None
+        phase = self.phase.tolist() if self.phase is not None else None
+        return {'times': times, 'values': values, 'errors': errors, 'phase': phase}
 
     def to_array(self):
         return np.column_stack((self.times, self.values, self.errors))
