@@ -28,15 +28,9 @@ class TimeSeriesDataBase(object):
         pass
 
     @abstractmethod
-    def get_features(self, id_):
-        pass
-
-    #can receive TimeSeries object or dict
-    @abstractmethod
     def update(self, id_, updated_values):
         pass
 
-    #can receive TimeSeries object or dict
     @abstractmethod
     def add_one(self, data):
         pass
@@ -51,6 +45,22 @@ class TimeSeriesDataBase(object):
 
     @abstractmethod
     def delete_catalog(self, catalog):
+        pass
+
+    @abstractmethod
+    def get_original_bands(self, id_):
+        pass
+
+    @abstractmethod
+    def get_features(self, id_):
+        pass
+
+    @abstractmethod
+    def get_metadata(self, id_):
+        pass
+
+    @abstractmethod
+    def get_reduced_vector(self, id_):
         pass
 
 
@@ -124,7 +134,6 @@ class MachoFileDataBase(TimeSeriesDataBase):
             list_of_time_series.append(DataMultibandTimeSeries.from_dict(dictionary))
         return list_of_time_series
 
-
     @staticmethod
     def _get_metadata_dict(field, tile, seq, file_string):
         metadata_string = file_string.split('\n')[1]
@@ -135,16 +144,6 @@ class MachoFileDataBase(TimeSeriesDataBase):
     def _get_band_dict(data_frame):
         times, values, errors = data_frame.values.T
         return {'times': list(times), 'values': list(values), 'errors': list(errors)}
-
-    def get_features(self, id_):
-        try:
-            field, tile, seq = id_.split('.')
-            tile_features_path = os.path.join(self.features_path, "F_{0}_{1}.csv".format(field, tile))
-            tile_features_df = pd.read_csv(tile_features_path, sep=',', index_col=0)
-            lc_features_df = tile_features_df.loc[id_]
-            return lc_features_df.to_dict()
-        except:
-            return {}
 
     #can receive TimeSeries object or dict
     def update(self, id_, updated_values):
@@ -169,7 +168,25 @@ class MachoFileDataBase(TimeSeriesDataBase):
         tars = glob.glob(os.path.join(field_path, '*.tar'))
         return [int(os.path.basename(file_name).split('.')[0]) for file_name in tars]
 
+    def get_features(self, id_):
+        try:
+            field, tile, seq = id_.split('.')
+            tile_features_path = os.path.join(self.features_path, "F_{0}_{1}.csv".format(field, tile))
+            tile_features_df = pd.read_csv(tile_features_path, sep=',', index_col=0)
+            lc_features_df = tile_features_df.loc[id_]
+            return lc_features_df.to_dict()
+        except:
+            return {}
 
+    def get_metadata(self, id_):
+        field, tile, seq = id_.split('.')
+        return {'field': field, 'tile':tile, 'seq': seq, 'catalog': 'macho'}
+
+    def get_reduced_vector(self, id_):
+        return None
+
+    def get_original_bands(self, id_):
+        pass
 
 class TimeSeriesMongoDataBase(TimeSeriesDataBase):
 
@@ -184,6 +201,9 @@ class TimeSeriesMongoDataBase(TimeSeriesDataBase):
         for collection_name in collection_names:
             collection = self.db[collection_name]
             collection.create_index([("id", pymongo.ASCENDING)], background=True)
+
+    def defragment(self):
+        pass
 
     def get_collection(self, catalog_name):
         return self.db[catalog_name]
@@ -210,9 +230,6 @@ class TimeSeriesMongoDataBase(TimeSeriesDataBase):
         collection = self.db[catalog_name]
         return collection.find(query)
 
-    def get_features(self, catalog_name, id_):
-        return self.get_one_dict(catalog_name, id_)['features']
-
     #can receive TimeSeries object or dict
     def update(self, catalog_name, id_, updated_datum):
         collection = self.db[catalog_name]
@@ -238,6 +255,20 @@ class TimeSeriesMongoDataBase(TimeSeriesDataBase):
 
     def delete_catalog(self, catalog_name):
         self.db[catalog_name].drop()
+
+    def get_features(self, catalog_name, id_):
+        return self.get_one_dict(catalog_name, id_)['features']
+
+    def get_metadata(self, catalog_name, id_):
+        return self.get_one_dict(catalog_name, id_)['metadata']
+
+    def get_reduced_vector(self, catalog_name, id_):
+        return self.get_one_dict(catalog_name, id_)['metadata']
+
+    def get_original_bands(self, catalog_name, id_):
+        bands_dict = self.get_one_dict(catalog_name, id_)
+        return DataMultibandTimeSeries.extract_bands_dict(bands_dict)
+
 
 
 class MultibandTimeSeries(object):
@@ -349,11 +380,9 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
     def period(self):
         if 'PeriodLS' in self.feature_dict:
             return self.feature_dict['PeriodLS']
-        if self.is_stored :
-            self.load_features_from_db()
-            if 'PeriodLS' in self.feature_dict:
-                return self.feature_dict['PeriodLS']
-        return self.calculate_period()
+        else:
+            self.calculate_period()
+            return self.feature_dict['PeriodLS']
 
     @property
     def feature_names(self):
@@ -405,7 +434,16 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
     def is_folded(self):
         return self._is_folded
 
-    def __init__(self, band_names, times, values, errors=None, id_=None, phase=None, feature_dict={}, **kwargs):
+    def __init__(self, band_names=None, times=None, values=None,
+                 errors=None, id_=None, phase=None, reduced_vector=None,
+                 feature_dict={}, metadata_dict={}):
+        self._set_bands(band_names, times, values, errors)
+        self._set_features(feature_dict)
+        self._set_metadata(metadata_dict)
+        self.set_reduced(reduced_vector)
+        self._id = id_
+
+    def _set_bands(self, band_names, times, values, errors, phase):
         n_bands_match = len(band_names) == len(times) == len(values)
         if errors is not None:
             n_bands_match = n_bands_match and len(band_names) == len(errors)
@@ -420,32 +458,38 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
             if phase is not None:
                 inputs_match = inputs_match and len(values[i]) == len(phase[i])
             if not inputs_match:
-                raise ValueError('Number of entries in time and values must match. Errors and Phase must also match if any.')
-        self._id = id_
-        self._feature_dictionary = feature_dict.copy()
-        self._id = id_
+                raise ValueError('Number of entries in time and values must match. '
+                                 'Errors and Phase must also match if any.')
+        self._band_names = band_names
         self._bands_dict = {}
         self._is_folded = phase is not None
-        self._band_names = sorted(band_names)
-        for i, band_name in zip(range(len(band_names)), band_names):
-            band_times = times[i]
-            band_values = values[i]
-            if errors is None:
-                band_errors = None
-            else:
-                band_errors = errors[i]
-            if phase is None:
-                band_phase = None
-            else:
-                band_phase = phase[i]
-            self._bands_dict[band_name] = TimeSeriesBand(self, band_name, band_times, band_values, band_errors, band_phase)
+        if band_names is not None:
+            for i, band_name in zip(range(len(band_names)), band_names):
+                band_times = times[i]
+                band_values = values[i]
+                if errors is None:
+                    band_errors = None
+                else:
+                    band_errors = errors[i]
+                if phase is None:
+                    band_phase = None
+                else:
+                    band_phase = phase[i]
+                self._bands_dict[band_name] = TimeSeriesBand(self, band_name, band_times,
+                                                             band_values, band_errors, band_phase)
 
-        self._metadata = kwargs.copy()
+
+    def _set_features(self, feature_dict):
+        self._feature_dictionary = feature_dict.copy()
+
+    def _set_metadata(self, metadata_dict):
+        self._metadata = metadata_dict.copy()
+
+    def _set_reduced(self, reduced_vector):
+        self._reduced_vector = reduced_vector.copy()
 
     @staticmethod
-    def from_dict(dictionary):
-        bands_dict = dictionary['bands']
-        id_ = dictionary['id']
+    def extract_bands_dict(bands_dict):
         times = []
         values = []
         errors = []
@@ -463,9 +507,20 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
                 phase.append(this_band_dict['phase'])
             else:
                 phase = None
-        features = dictionary['features']
-        metadata = dictionary['metadata']
-        time_series = DataMultibandTimeSeries(band_names, times, values, errors, id_, phase, features, **metadata)
+        return band_names, times, values, errors, phase
+
+
+    @staticmethod
+    def from_dict(dictionary):
+        if 'bands' in dictionary:
+            band_names, times, values, errors, phase = DataMultibandTimeSeries.extract_bands_dict(dictionary['bands'])
+        else:
+            times = values = errors = phase = band_names = None
+        id_ = dictionary['id']  if 'id' in dictionary else None
+        features = dictionary['features'] if 'features' in dictionary else None
+        metadata = dictionary['metadata'] if 'metadata' in dictionary else None
+        reduced_vector = dictionary['reduced'] if 'reduced' in dictionary else None
+        time_series = DataMultibandTimeSeries(band_names, times, values, errors, id_, phase, reduced_vector, features, metadata)
         return time_series
 
     def get_band(self, index_or_name):
@@ -512,8 +567,18 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
             features = feature_space.calculateFeature(preprocessed_data).result(method='dict')
             self._feature_dictionary['PeriodLS'] = features['PeriodLS']
 
+    def load_metadata_from_db(self, database):
+        self._feature_dictionary = database.get_metadata(self.id)
+
     def load_features_from_db(self, database):
             self._feature_dictionary = database.get_features(self.id)
+
+    def load_bands_from_db(self, database):
+        band_names, times, values, errors, phase = database.get_original_bands(self.id)
+        self._set_bands(band_names, times, values, errors, phase)
+
+    def load_reduced_vector_from_db(self, database):
+        self._set_reduced(database.get_reduced_vector(self.id))
 
     def to_dict(self):
         dictionary = {}
@@ -525,6 +590,7 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
         dictionary['bands'] = bands
         dictionary['metadata'] = self._metadata.copy()
         dictionary['id'] = self.id
+        dictionary['reduced'] = list(self._reduced_vector)
         return dictionary
 
     def fold(self):

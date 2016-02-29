@@ -53,6 +53,10 @@ class IncrementalClustering:
     def to_database(self, database):
         pass
 
+    @abstractmethod
+    def add_time_series(self):
+        pass
+
 
 class Birch(Picklable, IncrementalClustering):
 
@@ -641,7 +645,13 @@ class NonLeafClusteringFeature(ClusteringFeature):
         self.child.add(index, data_point_cf)
 
 
-class IncrementalPCA(Picklable):
+class DimensionalityReduction:
+    __metaclass__ = ABCMeta
+
+
+class IncrementalPCA(Picklable, DimensionalityReduction):
+
+
     def __init__(self, n_components = None):
         self.n_components = n_components
         self.cov = None
@@ -691,7 +701,6 @@ class IncrementalPCA(Picklable):
         d2 = np.diag(x2.T*x2)
         n2 = len(x2)
         x2_mean = np.mean(x2, axis=0)
-
         d1 = np.float128(d1)
         x1_mean = np.float128(x1_mean)
         n1 = np.float128(n1)

@@ -1,5 +1,5 @@
 __author__ = 'lucas'
-from offline_interface import get_macho_field, add_data
+from backend.offline.offline_interface import get_macho_field, add_data
 
 if __name__ == '__main__':
     macho_field = get_macho_field('/media/lucas/115d830f-0d51-49ad-8a2f-84544fbab639/MACHO_features_Harmonics', 1)
