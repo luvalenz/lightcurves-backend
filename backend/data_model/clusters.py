@@ -81,7 +81,7 @@ class ClustersMongoDataBase(ClustersDataBase):
             self._load_info()
         return self._counts
 
-    def __init__(self, url, port, db_name):
+    def __init__(self, db_name='clusters', url='localhost', port=27017):
         client = MongoClient(url, port)
         self.db = client[db_name]
         self._info_loaded = False

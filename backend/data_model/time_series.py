@@ -38,7 +38,11 @@ class TimeSeriesDataBase(object):
         pass
 
     @abstractmethod
-    def update(self, id_, updated_values):
+    def update_one(self, time_series):
+        pass
+
+    @abstractmethod
+    def update_many(self, time_series_list):
         pass
 
     @abstractmethod
@@ -178,7 +182,10 @@ class MachoFileDataBase(TimeSeriesDataBase):
         return {'times': list(times), 'values': list(values), 'errors': list(errors)}
 
     #can receive TimeSeries object or dict
-    def update(self, id_, updated_values):
+    def update_one(self, updated_datum, catalog_name, id_):
+        pass
+
+    def update_many(self, time_series_list):
         pass
 
     #can receive TimeSeries object or dict
@@ -235,7 +242,7 @@ class MachoFileDataBase(TimeSeriesDataBase):
 
 class TimeSeriesMongoDataBase(TimeSeriesDataBase):
 
-    def __init__(self, url, port, db_name):
+    def __init__(self, db_name='lightcurves', url='localhost', port=27017):
         client = MongoClient(url, port)
         self.db = client[db_name]
 
@@ -280,6 +287,13 @@ class TimeSeriesMongoDataBase(TimeSeriesDataBase):
             time_series_list.append(DataMultibandTimeSeries.from_dict(document))
         return time_series_list
 
+    def find_many(self, catalog_name, filter_dict):
+        collection = self.db[catalog_name]
+        cursor = collection.find(filter_dict)
+        time_series_list = []
+        for document in cursor:
+            time_series_list.append(DataMultibandTimeSeries.from_dict(document))
+        return time_series_list
     def metadata_search(self, catalog_name, **kwargs):
         query = []
         for key, value in kwargs.iteritems():
@@ -287,12 +301,15 @@ class TimeSeriesMongoDataBase(TimeSeriesDataBase):
         collection = self.db[catalog_name]
         return collection.find(query)
 
-    #can receive TimeSeries object or dict
-    def update(self, catalog_name, id_, updated_datum):
-        collection = self.db[catalog_name]
-        if not isinstance(updated_datum, dict):
-            updated_datum = updated_datum.to_dict()
-        collection.replace_one({'id':id_}, updated_datum)
+    #receives TimeSeries
+    def update_one(self, time_series):
+        collection = self.db[time_series.catalog]
+        updated_datum = time_series.to_dict()
+        collection.replace_one({'id':time_series.id}, updated_datum)
+
+    def update_many(self, time_series_list):
+        for time_series in time_series_list:
+            self.update_one(time_series)
 
     #can receive TimeSeries object or dict
     def add_one(self, catalog_name, datum):
@@ -327,12 +344,12 @@ class TimeSeriesMongoDataBase(TimeSeriesDataBase):
         return DataMultibandTimeSeries.extract_bands_dict(bands_dict)
 
     def get_clustering_model(self):
-        binary_data = self.db['models'].find({'model': 'clustering'})['bin-data']
-        return pickle.load(binary_data)
+        binary_data = self.db['models'].find_one({'model': 'clustering'})['bin-data']
+        return pickle.loads(binary_data)
 
     def get_reduction_model(self):
-        binary_data = self.db['models'].find({'model': 'reduction'})['bin-data']
-        return pickle.load(binary_data)
+        binary_data = self.db['models'].find_one({'model': 'reduction'})['bin-data']
+        return pickle.loads(binary_data)
 
     def set_clustering_model(self, model):
         binary_data = pickle.dumps(model)
@@ -342,7 +359,7 @@ class TimeSeriesMongoDataBase(TimeSeriesDataBase):
     def set_reduction_model(self, model):
         binary_data = pickle.dumps(model)
         document = {'model': 'reduction', 'bin-data': Binary(binary_data)}
-        self.db['models'].replace_one({'model': 'reduction'}, document)
+        return self.db['models'].replace_one({'model': 'reduction'}, document, True)
 
 
 class MultibandTimeSeries(object):
@@ -481,6 +498,10 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
         return dict(self._feature_dictionary)
 
     @property
+    def reduced_vector(self):
+        return self._reduced_vector
+
+    @property
     def times(self):
         result = []
         for band in self.bands:
@@ -530,7 +551,7 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
         self._set_bands(band_names, times, values, errors, phase)
         self._set_features(feature_dict)
         self._set_metadata(metadata_dict)
-        self._set_reduced(reduced_vector)
+        self.set_reduced(reduced_vector)
         self._id = id_
 
     def _set_bands(self, band_names, times, values, errors, phase):
@@ -574,7 +595,7 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
     def _set_metadata(self, metadata_dict):
         self._metadata = metadata_dict.copy()
 
-    def _set_reduced(self, reduced_vector):
+    def set_reduced(self, reduced_vector):
         self._reduced_vector = list(reduced_vector) if reduced_vector is not None else None
 
     @staticmethod
@@ -597,7 +618,6 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
             else:
                 phase = None
         return band_names, times, values, errors, phase
-
 
     @staticmethod
     def from_dict(dictionary):
@@ -667,7 +687,7 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
         self._set_bands(band_names, times, values, errors, phase)
 
     def load_reduced_vector_from_db(self, database):
-        self._set_reduced(database.get_reduced_vector(self.catalog, self.id))
+        self.set_reduced(database.get_reduced_vector(self.catalog, self.id))
 
     def to_dict(self):
         dictionary = {}
