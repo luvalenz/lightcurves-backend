@@ -12,19 +12,6 @@ import operator
 #python 2
 
 
-class Picklable:
-    __metaclass__ = ABCMeta
-
-    @staticmethod
-    def from_pickle(path):
-        pkl_file = open(path, 'rb')
-        return pickle.load(pkl_file)
-
-    def to_pickle(self, path, file_name):
-        output = open(os.path.join(path, '{0}.pkl'.format(file_name)), 'wb')
-        pickle.dump(self, output)
-        output.close()
-
 
 class IncrementalClustering:
     __metaclass__ = ABCMeta
@@ -58,7 +45,7 @@ class IncrementalClustering:
         pass
 
 
-class Birch(Picklable, IncrementalClustering):
+class Birch(IncrementalClustering):
 
     def __init__(self, threshold, cluster_distance_measure='d0', cluster_size_measure='r', n_global_clusters=50, branching_factor=50):
         self.branching_factor = branching_factor
@@ -645,14 +632,21 @@ class NonLeafClusteringFeature(ClusteringFeature):
         self.child.add(index, data_point_cf)
 
 
-class DimensionalityReduction:
+class IncrementalDimensionalityReduction:
     __metaclass__ = ABCMeta
 
+    @abstractmethod
+    def add_transform_time_series(self):
+        pass
 
-class IncrementalPCA(Picklable, DimensionalityReduction):
+    @abstractmethod
+    def update(self, database):
+        pass
 
 
-    def __init__(self, n_components = None):
+class IncrementalPCA(IncrementalDimensionalityReduction):
+
+    def __init__(self, n_components=None):
         self.n_components = n_components
         self.cov = None
         self._W = None
@@ -712,10 +706,23 @@ class IncrementalPCA(Picklable, DimensionalityReduction):
     @property
     def W(self):
         if self._W is None:
-            self.calculate_W()
+            self._calculate_W()
         return self._W
 
-    def add(self, X):
+    def _calculate_W(self):
+        eigenvalues, eigenvectors = np.linalg.eig(self.cov)
+        eigenvalues_order = np.argsort(eigenvalues)[::-1]
+        #sorted_eigenvalues = eigenvalues[eigenvalues_order]
+        sorted_eigenvectors = eigenvectors[:,eigenvalues_order]
+        self._W = sorted_eigenvectors
+        if self.n_components is not None:
+            self._W = self._W[:,:self.n_components]
+
+    def _transform_data_matrix(self, X):
+        standarized_X = IncrementalPCA.standarize(X)
+        return np.dot(standarized_X, self.W)
+
+    def add_data_matrix(self, X):
         X = np.matrix(X)
         self._W = None
         if self.cov is None:
@@ -729,19 +736,25 @@ class IncrementalPCA(Picklable, DimensionalityReduction):
                 print(self.cov)
             n = self.n + len(X)
 
-    def calculate_W(self):
-        eigenvalues, eigenvectors = np.linalg.eig(self.cov)
-        eigenvalues_order = np.argsort(eigenvalues)[::-1]
-        sorted_eigenvalues = eigenvalues[eigenvalues_order]
-        sorted_eigenvectors = eigenvectors[:,eigenvalues_order]
-        self._W = sorted_eigenvectors
-        if self.n_components is not None:
-            self._W = self._W[:,:self.n_components]
-
-    def transform(self, X):
-        standarized_X = IncrementalPCA.standarize(X)
-        return np.dot(standarized_X, self.W)
-
-    def add_transform(self, X):
+    def add_transform_data_matrix(self, X):
         self.add(X)
-        return self.transform(X)
+        return self._transform_data_matrix(X)
+
+    def add_transform_time_series(self, time_series_list):
+        feature_matrix = []
+        for time_series in time_series_list:
+            feature_matrix.append(time_series.feature_vector)
+        feature_matrix = np.matrix(feature_matrix)
+        reduced_matrix = self.add_transform_data_matrix(feature_matrix)
+        for reduced_vector, time_series in zip(reduced_matrix, time_series_list):
+            time_series.set_reduced(np.array(reduced_vector).flatten())
+
+    def update(self, database):
+        database.update_reduction_model(self)
+
+
+
+
+
+
+

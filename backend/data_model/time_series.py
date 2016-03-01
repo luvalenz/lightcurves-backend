@@ -14,10 +14,20 @@ else:
 import pymongo
 from pymongo import MongoClient
 import glob
+import pickle
+from bson.binary import Binary
 
 
 class TimeSeriesDataBase(object):
     __metaclass__ = ABCMeta
+
+    @abstractmethod
+    def setup(self):
+        pass
+
+    @abstractmethod
+    def defragment(self):
+        pass
 
     @abstractmethod
     def get_one(self, id_, original=True, phase=True, features=True, metadata=True):
@@ -63,12 +73,34 @@ class TimeSeriesDataBase(object):
     def get_reduced_vector(self, id_):
         pass
 
+    @abstractmethod
+    def get_clustering_model(self):
+        pass
+
+    @abstractmethod
+    def get_reduction_model(self):
+        pass
+
+    @abstractmethod
+    def set_clustering_model(self, model):
+        pass
+
+    @abstractmethod
+    def set_reduction_model(self, model):
+        pass
+
 
 class MachoFileDataBase(TimeSeriesDataBase):
 
     def __init__(self, light_curves_path, features_path):
         self.light_curves_path = light_curves_path
         self.features_path = features_path
+
+    def setup(self):
+        pass
+
+    def defragment(self):
+        pass
 
     def get_one_dict(self, id_, original=True, phase=False, features=True, metadata=True):
         field, tile, seq = id_.split('.')
@@ -102,6 +134,7 @@ class MachoFileDataBase(TimeSeriesDataBase):
         tar = tarfile.open(tar_path)
         paths = tar.getnames()
         ids = [path.split('_')[-1][:-6] for path in paths if path.endswith('.mjd')]
+        ids = sorted(list(set(ids)))
         band_names = ['B', 'R']
         bands_dict = {}
         metadata_dict = None
@@ -128,7 +161,6 @@ class MachoFileDataBase(TimeSeriesDataBase):
 
     def get_many(self, field, tile, original=True, phase=False, features=True, metadata=True):
         list_of_dicts = self.get_many_dict(field, tile, original, phase, features, metadata)
-        print(len(list_of_dicts))
         list_of_time_series = []
         for dictionary in list_of_dicts:
             list_of_time_series.append(DataMultibandTimeSeries.from_dict(dictionary))
@@ -166,7 +198,7 @@ class MachoFileDataBase(TimeSeriesDataBase):
     def get_tiles_in_field(self, field):
         field_path = os.path.join(self.light_curves_path, 'F_{0}'.format(field))
         tars = glob.glob(os.path.join(field_path, '*.tar'))
-        return [int(os.path.basename(file_name).split('.')[0]) for file_name in tars]
+        return sorted([int(os.path.basename(file_name).split('.')[0]) for file_name in tars])
 
     def get_features(self, id_):
         try:
@@ -188,22 +220,43 @@ class MachoFileDataBase(TimeSeriesDataBase):
     def get_original_bands(self, id_):
         pass
 
+    def get_clustering_model(self):
+        pass
+
+    def get_reduction_model(self):
+        pass
+
+    def set_clustering_model(self, model):
+        pass
+
+    def set_reduction_model(self, model):
+        pass
+
+
 class TimeSeriesMongoDataBase(TimeSeriesDataBase):
 
     def __init__(self, url, port, db_name):
         client = MongoClient(url, port)
         self.db = client[db_name]
 
-    def setup(self, collection_names = []):
+    def setup(self, collection_names=None):
+        if collection_names is None:
+            collection_names = []
         existing_collection_names = self.db.collection_names()
         collection_names = list(set(existing_collection_names + collection_names))
-        collection_names.remove('system.indexes')
+        if 'system.indexes' in collection_names:
+            collection_names.remove('system.indexes')
         for collection_name in collection_names:
             collection = self.db[collection_name]
-            collection.create_index([("id", pymongo.ASCENDING)], background=True)
+            collection.create_index([("id", pymongo.ASCENDING)], background=True, unique=True)
 
     def defragment(self):
-        pass
+        collection_names = self.db.collection_names()
+        collection_names.remove('system.indexes')
+        results = {}
+        for collection_name in collection_names:
+            results[collection_name] = self.db.command('compact', collection_name)
+        return results
 
     def get_collection(self, catalog_name):
         return self.db[catalog_name]
@@ -213,7 +266,11 @@ class TimeSeriesMongoDataBase(TimeSeriesDataBase):
         return collection.find_one({'id': id_})
 
     def get_one(self, catalog, id_):
-        return DataMultibandTimeSeries.from_dict(self.get_one_dict(catalog, id_))
+        dictionary = self.get_one_dict(catalog, id_)
+        if dictionary is not None:
+            return DataMultibandTimeSeries.from_dict(dictionary)
+        else:
+            return None
 
     def get_many(self, catalog_name, id_list):
         collection = self.db[catalog_name]
@@ -263,12 +320,29 @@ class TimeSeriesMongoDataBase(TimeSeriesDataBase):
         return self.get_one_dict(catalog_name, id_)['metadata']
 
     def get_reduced_vector(self, catalog_name, id_):
-        return self.get_one_dict(catalog_name, id_)['metadata']
+        return self.get_one_dict(catalog_name, id_)['reduced']
 
     def get_original_bands(self, catalog_name, id_):
-        bands_dict = self.get_one_dict(catalog_name, id_)
+        bands_dict = self.get_one_dict(catalog_name, id_)['bands']
         return DataMultibandTimeSeries.extract_bands_dict(bands_dict)
 
+    def get_clustering_model(self):
+        binary_data = self.db['models'].find({'model': 'clustering'})['bin-data']
+        return pickle.load(binary_data)
+
+    def get_reduction_model(self):
+        binary_data = self.db['models'].find({'model': 'reduction'})['bin-data']
+        return pickle.load(binary_data)
+
+    def set_clustering_model(self, model):
+        binary_data = pickle.dumps(model)
+        document = {'model': 'clustering', 'bin-data': Binary(binary_data)}
+        self.db['models'].replace_one({'model': 'clustering'}, document)
+
+    def set_reduction_model(self, model):
+        binary_data = pickle.dumps(model)
+        document = {'model': 'reduction', 'bin-data': Binary(binary_data)}
+        self.db['models'].replace_one({'model': 'reduction'}, document)
 
 
 class MultibandTimeSeries(object):
@@ -276,6 +350,10 @@ class MultibandTimeSeries(object):
 
     @abstractproperty
     def id(self):
+        pass
+
+    @abstractmethod
+    def catalog(self):
         pass
 
     @abstractproperty
@@ -366,6 +444,10 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
         return self._id
 
     @property
+    def catalog(self):
+        return self._metadata['catalog']
+
+    @property
     def bands(self):
         result = []
         for band_name in self._band_names:
@@ -386,11 +468,13 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
 
     @property
     def feature_names(self):
-        return self.feature_dict.keys()
+        sorted_features = sorted(self._feature_dictionary.items(), key=lambda x:x[0])
+        return [key for (key, value) in sorted_features]
 
     @property
     def feature_vector(self):
-        return np.array(self.feature_dict.values())
+        sorted_features = sorted(self._feature_dictionary.items(), key=lambda x:x[0])
+        return np.array([value for (key, value) in sorted_features])
 
     @property
     def feature_dict(self):
@@ -436,11 +520,17 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
 
     def __init__(self, band_names=None, times=None, values=None,
                  errors=None, id_=None, phase=None, reduced_vector=None,
-                 feature_dict={}, metadata_dict={}):
-        self._set_bands(band_names, times, values, errors)
+                 feature_dict=None, metadata_dict=None):
+        if band_names is None:
+            band_names = []
+        if feature_dict is None:
+            feature_dict = {}
+        if metadata_dict is None:
+            feature_dict = {}
+        self._set_bands(band_names, times, values, errors, phase)
         self._set_features(feature_dict)
         self._set_metadata(metadata_dict)
-        self.set_reduced(reduced_vector)
+        self._set_reduced(reduced_vector)
         self._id = id_
 
     def _set_bands(self, band_names, times, values, errors, phase):
@@ -478,7 +568,6 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
                 self._bands_dict[band_name] = TimeSeriesBand(self, band_name, band_times,
                                                              band_values, band_errors, band_phase)
 
-
     def _set_features(self, feature_dict):
         self._feature_dictionary = feature_dict.copy()
 
@@ -486,7 +575,7 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
         self._metadata = metadata_dict.copy()
 
     def _set_reduced(self, reduced_vector):
-        self._reduced_vector = reduced_vector.copy()
+        self._reduced_vector = list(reduced_vector) if reduced_vector is not None else None
 
     @staticmethod
     def extract_bands_dict(bands_dict):
@@ -568,17 +657,17 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
             self._feature_dictionary['PeriodLS'] = features['PeriodLS']
 
     def load_metadata_from_db(self, database):
-        self._feature_dictionary = database.get_metadata(self.id)
+        self._metadata_dictionary = database.get_metadata(self.catalog, self.id)
 
     def load_features_from_db(self, database):
-            self._feature_dictionary = database.get_features(self.id)
+            self._feature_dictionary = database.get_features(self.catalog, self.id)
 
     def load_bands_from_db(self, database):
-        band_names, times, values, errors, phase = database.get_original_bands(self.id)
+        band_names, times, values, errors, phase = database.get_original_bands(self.catalog, self.id)
         self._set_bands(band_names, times, values, errors, phase)
 
     def load_reduced_vector_from_db(self, database):
-        self._set_reduced(database.get_reduced_vector(self.id))
+        self._set_reduced(database.get_reduced_vector(self.catalog, self.id))
 
     def to_dict(self):
         dictionary = {}
@@ -590,7 +679,7 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
         dictionary['bands'] = bands
         dictionary['metadata'] = self._metadata.copy()
         dictionary['id'] = self.id
-        dictionary['reduced'] = list(self._reduced_vector)
+        dictionary['reduced'] = list(self._reduced_vector) if self._reduced_vector is not None else None
         return dictionary
 
     def fold(self):

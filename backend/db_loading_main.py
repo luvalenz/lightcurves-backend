@@ -9,6 +9,8 @@ def load_macho_field_to_mongo(field):
     light_curves_path = '/media/lucas/115d830f-0d51-49ad-8a2f-84544fbab639/MACHO_LMC'
     macho_db = MachoFileDataBase(light_curves_path, features_path)
     mongo_db = TimeSeriesMongoDataBase('localhost', 27017, 'lightcurves')
+
+    mongo_db.setup(['macho'])
     catalog_name = 'macho'
     tiles = macho_db.get_tiles_in_field(field)
     for tile in tiles:
