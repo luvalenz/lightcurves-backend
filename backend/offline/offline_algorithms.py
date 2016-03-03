@@ -12,12 +12,10 @@ import operator
 #python 2
 
 
-
 class IncrementalClustering:
     __metaclass__ = ABCMeta
 
-    @abstractmethod
-    def add_many_time_series(self):
+    def __init__(self):
         pass
 
     @abstractproperty
@@ -25,13 +23,27 @@ class IncrementalClustering:
         pass
 
     @abstractmethod
-    def get_cluster_list(self):
+    def add_many_time_series(self, time_series_list):
         pass
 
-    @abstractproperty
-    def number_of_clusters\
-                    (self):
+    @abstractmethod
+    #kwargs options
+    def get_cluster_list(self, database, **kwargs):
         pass
+
+    @abstractmethod
+    def is_fitted(self, **kwargs):
+        pass
+
+    @abstractmethod
+    def fit(self, **kwargs):
+        pass
+
+    #kwargs options
+    @abstractmethod
+    def get_number_of_clusters(self, **kwargs):
+        pass
+
 
 class Birch(IncrementalClustering):
 
@@ -40,18 +52,11 @@ class Birch(IncrementalClustering):
         self.threshold = threshold
         self.cluster_size_measure = cluster_size_measure
         self.cluster_distance_measure = cluster_distance_measure
+        self._data_ids = []
         self.root = BirchNode(self, True)
         self._local_labels = None
         self._global_labels = None
         self.n_global_clusters = n_global_clusters
-
-    @property
-    def _has_labels(self):
-        return self._local_labels is not None
-
-    @property
-    def _has_global_labels(self):
-        return self._global_labels is not None
 
     @property
     def count(self):
@@ -61,107 +66,132 @@ class Birch(IncrementalClustering):
             result += cf.count
         return result
 
+    def add_many_time_series(self, time_series_list):
+        self._local_labels = None
+        self._global_labels = None
+        for time_series in time_series_list:
+            self._try_add_time_series(time_series)
+
+    def get_cluster_list(self, **kwargs):
+        global_clusters = False
+        if 'clusters_type' in kwargs and kwargs['clusters_type'] == 'global':
+            global_clusters = True
+        if global_clusters:
+            labels = self.global_labels
+            unique_labels = self.unique_global_labels
+            centers = self.global_centers
+        else:
+            labels = self.local_labels
+            unique_labels = self.unique_local_labels
+            centers = self.centers
+        cluster_list = []
+        for center, label in itertools.izip(centers, unique_labels):
+            lc_indices = labels[np.where(labels[:,1] == label)[0]][:,0]
+            cluster_list.append(lc_indices)
+        return lc_indices
+
+    def is_fitted(self, **kwargs):
+        global_clusters = False
+        if 'clusters_type' in kwargs and kwargs['clusters_type'] == 'global':
+            global_clusters = True
+        if global_clusters:
+            return self.has_global_labels
+        else:
+            return self.has_local_labels
+
+    def fit(self, **kwargs):
+        global_clusters = False
+        if 'clusters_type' in kwargs and kwargs['clusters_type'] == 'global':
+            global_clusters = True
+        if global_clusters:
+            self._do_global_clustering()
+        else:
+            return self.has_local_labels
+
+    def get_number_of_clusters(self, **kwargs):
+        global_clusters = False
+        if 'clusters_type' in kwargs and kwargs['clusters_type'] == 'global':
+            global_clusters = True
+        if global_clusters:
+            return self.number_of_global_labels
+        else:
+            return self.number_of_local_labels
+
     @property
-    def _local_labels(self):
-        if not self._has_labels:
-            self.generate_labels()
+    def has_local_labels(self):
+        return self._local_labels is not None
+
+    @property
+    def has_global_labels(self):
+        return self._global_labels is not None
+
+    @property
+    def local_labels(self):
+        if not self.has_local_labels:
+            self._generate_labels()
         return self._local_labels
 
     @property
-    def _global_labels(self):
-        if not self._has_global_labels:
-            self.do_global_clustering()
+    def global_labels(self):
+        if not self.has_global_labels:
+            self._do_global_clustering()
         return self._global_labels
 
     @property
-    def _centers(self):
-        if not self._has_labels:
-            self.generate_labels()
+    def centers(self):
+        if not self.has_local_labels:
+            self._generate_labels()
         return (self._linear_sums.T / self._counts).T
 
     @property
-    def _squared_norms(self):
-        if not self._has_labels:
-            self.generate_labels()
+    def squared_norms(self):
+        if not self.has_local_labels:
+            self._generate_labels()
         return self._squared_norms
 
     @property
-    def _linear_sums(self):
-        if not self._has_labels:
-            self.generate_labels()
+    def linear_sums(self):
+        if not self.has_local_labels:
+            self._generate_labels()
         return self._linear_sums
 
     @property
-    def _counts(self):
-        if not self._has_labels:
-            self.generate_labels()
+    def counts(self):
+        if not self.has_local_labels:
+            self._generate_labels()
         return self._counts
 
     @property
-    def _global_centers(self):
-        if not self._has_labels:
-            self.do_global_clustering()
+    def global_centers(self):
+        if not self.has_local_labels:
+            self._do_global_clustering()
         return self._global_centers
 
     @property
-    def _unique_labels(self):
-        if not self._has_labels:
-            self.generate_labels()
-        return list(set(self._local_labels[:,1].tolist()))
+    def unique_local_labels(self):
+        if not self.has_local_labels:
+            self._generate_labels()
+        return list(set(self.local_labels[:,1].tolist()))
 
     @property
-    def _unique_global_labels(self):
-        if not self._has_global_labels:
-            self.do_global_clustering()
+    def unique_global_labels(self):
+        if not self.has_global_labels:
+            self._do_global_clustering()
         return list(set(self.global_labels[:,1].tolist()))
 
     @property
-    def _number_of_labels(self):
-        if not self._has_labels:
-            self.generate_labels()
-        return len(self._unique_labels)
+    def number_of_local_labels(self):
+        if not self.has_local_labels:
+            self._generate_labels()
+        return len(self.unique_local_labels)
 
     @property
     def number_of_global_labels(self):
-        if not self._has_global_labels:
-            self.do_global_clustering()
-        return len(self._unique_global_labels)
+        if not self.has_global_labels:
+            self._do_global_clustering()
+        return len(self.unique_global_labels)
 
-    def to_files(self, name, path):
-        full_path = os.path.join(path, name)
-        if not os.path.exists(full_path):
-            try:
-                os.makedirs(full_path)
-            except OSError:
-                print("Directory already exists")
-        centers_df = pd.DataFrame(self._centers)
-        centers_df.to_csv(os.path.join(full_path, 'centers.csv'))
-        radii = []
-        sizes = []
-        for center, label in zip(self._centers, self._unique_labels):
-            lc_indices = self._local_labels[np.where(self._local_labels[:,1] == label)[0]][:,0]
-            if self.data_in_memory:
-                data_points = self.data.loc[lc_indices]
-                distances = dist.cdist(np.matrix(center), np.matrix(data_points.values))[0]
-                data_points['distances'] = pd.Series(distances, index=data_points.index)
-                sorted_data_points = data_points.iloc[np.argsort(distances)]
-                sorted_data_points.to_csv(os.path.join(full_path, 'class{0}.csv'.format(int(float(label)))))
-                radii.append(sorted_data_points['distances'][-1])
-                sizes.append(data_points.shape[0])
-        pd.DataFrame(radii).to_csv(os.path.join(full_path, 'radii.csv'))
-        pd.DataFrame(sizes).to_csv(os.path.join(full_path, 'sizes.csv'))
-
-    def to_pickle(self, name, path):
-        output = open(os.path.join(path, '{0}_birch.pkl'.format(name)), 'wb')
-        pickle.dump(self, output)
-        output.close()
-
-    @staticmethod
-    def from_pickle(path):
-        pkl_file = open(path, 'rb')
-        return pickle.load(pkl_file)
-
-    def generate_labels(self):
+    def _generate_labels(self):
         clusters = self.root.get_clusters()
         labels = np.empty((0,2))
         next_label = 0
@@ -179,12 +209,12 @@ class Birch(IncrementalClustering):
         self._local_labels = labels
         self._counts = np.array(counts)
         self._linear_sums = np.vstack(linear_sums)
-        self.squared_norms = np.array(squared_norms)
+        self._squared_norms = np.array(squared_norms)
 
-    def do_global_clustering(self):
-        counts = self._counts
-        linear_sums = self._linear_sums
-        squared_norms = self._squared_norms
+    def _do_global_clustering(self):
+        counts = self.counts
+        linear_sums = self.linear_sums
+        squared_norms = self.squared_norms
         n_clusters = len(counts)
         distances = []
         indices_dict = {}
@@ -231,8 +261,8 @@ class Birch(IncrementalClustering):
         global_labels = []
         next_global_label = 0
         for cluster_indices in indices_list:
-            linear_sum = np.sum(self._linear_sums[cluster_indices], axis=0)
-            count = np.sum(self._counts[cluster_indices])
+            linear_sum = np.sum(self.linear_sums[cluster_indices], axis=0)
+            count = np.sum(self.counts[cluster_indices])
             center = linear_sum / count
             global_centers.append(center)
             index_mask = []
@@ -266,23 +296,71 @@ class Birch(IncrementalClustering):
         else:
             return Birch.d0(count_1, linear_sum_1, squared_norm1, count_2, linear_sum_2, squared_norm2)
 
-    def add_pandas_data_frame(self, data_frame):
-        self._local_labels = None
-        self._global_labels = None
-        indices = data_frame.index.values
-        data_points = data_frame.values
-        for index, data_point in itertools.izip(indices, data_points):
-            self.add_data_point(index, data_point)
-        if self.data_in_memory:
-            if self.data is None:
-                self.data = data_frame
-            else:
-                self.data = pd.concat([self.data, data_frame])
+    def _try_add_time_series(self, time_series):
+        reduced_vector = time_series.reduced_vector
+        id_ = time_series.id
+        if id_ in self._data_ids:
+            if reduced_vector is not None and len(reduced_vector) != 0:
+                self._add_data_point(id_, reduced_vector)
 
-    def add_data_point(self, index, data_point):
+    def _add_data_point(self, id_, data_point):
         squared_norm = np.linalg.norm(data_point)**2
         data_point_cf = data_point, squared_norm
-        self.root.add(index, data_point_cf)
+        self._data_ids.append(id_)
+        self.root.add(id_, data_point_cf)
+
+    @staticmethod
+    def to_float(count, linear_sum, squared_norm):
+        return float(count), linear_sum.astype(np.float32), squared_norm.astype(np.float32)
+
+    @staticmethod
+    def radius(count, linear_sum, squared_norm):
+        count, linear_sum, squared_norm = Birch.to_float(count, linear_sum, squared_norm)
+        centroid = linear_sum/count
+        result = np.sqrt(squared_norm/count - np.linalg.norm(centroid)**2)
+        return result
+
+    @staticmethod
+    def diameter(count, linear_sum, squared_norm):
+        count, linear_sum, squared_norm = Birch.to_float(count, linear_sum, squared_norm)
+        return np.sqrt(2)*Birch.radius(count, linear_sum, squared_norm)
+
+    @staticmethod
+    def d0(count_1, linear_sum_1, squared_norm_1, count_2, linear_sum_2, squared_norm_2):
+        count_1, linear_sum_1, squared_norm_1 = Birch.to_float(count_1, linear_sum_1, squared_norm_1)
+        count_2, linear_sum_2, squared_norm_2 = Birch.to_float(count_2, linear_sum_2, squared_norm_2)
+        centroid_1 = linear_sum_1/count_1
+        centroid_2 = linear_sum_2/count_2
+        return np.linalg.norm(centroid_1-centroid_2)**2
+
+    @staticmethod
+    def d1(count_1, linear_sum_1, squared_norm_1, count_2, linear_sum_2, squared_norm_2):
+        count_1, linear_sum_1, squared_norm_1 = Birch.to_float(count_1, linear_sum_1, squared_norm_1)
+        count_2, linear_sum_2, squared_norm_2 = Birch.to_float(count_2, linear_sum_2, squared_norm_2)
+        centroid_1 = linear_sum_1/count_1
+        centroid_2 = linear_sum_2/count_2
+        return np.sum(np.abs(centroid_1-centroid_2))
+
+    @staticmethod
+    def d2(count_1, linear_sum_1, squared_norm1, count_2, linear_sum_2, squared_norm2):
+        return np.sqrt(squared_norm1/count_1 + squared_norm2/count_2 - 2*np.dot(linear_sum_1, linear_sum_2)/count_1/count_2)
+
+    @staticmethod
+    def d3(count_1, linear_sum_1, squared_norm_1, count_2, linear_sum_2, squared_norm_2):
+        count_1, linear_sum_1, squared_norm_1 = Birch.to_float(count_1, linear_sum_1, squared_norm_1)
+        count_2, linear_sum_2, squared_norm_2 = Birch.to_float(count_2, linear_sum_2, squared_norm_2)
+        return Birch.diameter(count_1+count_2,linear_sum_1+linear_sum_2,squared_norm_1+squared_norm_2)
+
+    @staticmethod
+    def d4(count_1, linear_sum_1, squared_norm1, count_2, linear_sum_2, squared_norm2):
+        count = count_1 + count_2
+        ss = squared_norm1 + squared_norm2
+        ls = linear_sum_1 + linear_sum_2
+        result_merged = count * Birch.radius(count, ls, ss)**2
+        result_1 = count_1 * Birch.radius(count_1, linear_sum_1, squared_norm1)**2
+        result_2 = count_2 * Birch.radius(count_2, linear_sum_2, squared_norm2)**2
+        result = result_merged - result_1 - result_2
+        return result
 
     @staticmethod
     def to_float(count, linear_sum, squared_norm):
@@ -340,20 +418,15 @@ class Birch(IncrementalClustering):
 
 class BirchNode:
 
-
     def __init__(self, birch, is_leaf = False):
         self.birch = birch
         self._clustering_features = []
         self.is_leaf = is_leaf
         self.cf_parent = None
-        global number
-        self.number = number
-        number += 1
 
     @property
     def size(self):
         return len(self._clustering_features)
-
 
     @property
     def has_to_split(self):
@@ -399,7 +472,7 @@ class BirchNode:
             best_cf = self._clustering_features[np.argmin(distances)]
             can_be_added = best_cf.can_add(index, data_point_cf)
             if can_be_added:
-                best_cf._add_data_matrix(index, data_point_cf)
+                best_cf.add(index, data_point_cf)
             else:
                 new_cf = LeafClusteringFeature(self.birch)
                 self.add_clustering_feature(new_cf)
@@ -412,7 +485,6 @@ class BirchNode:
         cf.node = self
         if not self.is_root and not cf.is_empty:
             self.cf_parent.update(cf.count, cf.linear_sum, cf.squared_norm)
-
 
     #returns tuple with center and indices of leaf clusters
     def get_clusters(self):
@@ -461,7 +533,6 @@ class BirchNode:
         for cf in mergers_cfs:
             new_node.add_clustering_feature(cf)
         self.merge_replace_cf(new_cf, merger0, merger1)
-
 
     def split(self):
         last_split = True
@@ -525,9 +596,6 @@ class ClusteringFeature:
         self.squared_norm = squared_norm
         self.count = count
         self.node = None
-        global number
-        self.number = number
-        number += 1
 
 
     @property
@@ -608,7 +676,7 @@ class NonLeafClusteringFeature(ClusteringFeature):
         return self.child.get_clusters()
 
     def add(self, index, data_point_cf):
-        self.child._add_data_matrix(index, data_point_cf)
+        self.child.add(index, data_point_cf)
 
 
 class IncrementalDimensionalityReduction:

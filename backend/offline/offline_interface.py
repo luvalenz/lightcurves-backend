@@ -69,7 +69,7 @@ class OfflineInterface(object):
         reduction_model = self.get_reduction_model()
         reduced_data = reduction_model.add_transform(dataframe.values)
         clustering_model.add_pandas_data_frame(pd.DataFrame(reduced_data, index=dataframe.index.values))
-        clustering_model.to_files(self.clusters_full_path)
+        clustering_model._to_files(self.clusters_full_path)
         clustering_model.to_pickle(self.clusters_full_path, 'clustering_model')
         reduction_model.to_pickle(self.clusters_full_path, 'reduction_model')
 
