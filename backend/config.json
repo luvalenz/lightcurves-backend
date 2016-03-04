@@ -22,11 +22,18 @@
             { "type": "macho",
               "parameters": []}
           ],
-  "cluster_databases":
+  "clustering_databases":
           [
             {
               "type": "mongodb",
               "parameters": [1, 2, 3]
+            }
+          ],
+  "serializing_databases":
+          [
+            {
+              "type": "mongodb",
+              "parameters":[1,2,3]
             }
           ]
  }

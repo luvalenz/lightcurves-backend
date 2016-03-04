@@ -21,6 +21,10 @@ from bson.binary import Binary
 class TimeSeriesDataBase(object):
     __metaclass__ = ABCMeta
 
+    @abstractproperty
+    def catalog_names(self):
+        pass
+
     @abstractmethod
     def setup(self):
         pass
@@ -78,27 +82,22 @@ class TimeSeriesDataBase(object):
         pass
 
     @abstractmethod
-    def get_clustering_model(self):
+    def reset_cursor(self):
         pass
 
     @abstractmethod
-    def get_reduction_model(self):
+    def next_batch(self):
         pass
-
-    @abstractmethod
-    def set_clustering_model(self, model):
-        pass
-
-    @abstractmethod
-    def set_reduction_model(self, model):
-        pass
-
 
 class MachoFileDataBase(TimeSeriesDataBase):
 
     def __init__(self, light_curves_path, features_path):
         self.light_curves_path = light_curves_path
         self.features_path = features_path
+
+    @property
+    def catalog_names(self):
+        pass
 
     def setup(self):
         pass
@@ -224,35 +223,37 @@ class MachoFileDataBase(TimeSeriesDataBase):
     def get_reduced_vector(self, id_):
         return None
 
+    def reset_cursor(self):
+        pass
+
+    def next_batch(self):
+        pass
+
     def get_original_bands(self, id_):
-        pass
-
-    def get_clustering_model(self):
-        pass
-
-    def get_reduction_model(self):
-        pass
-
-    def set_clustering_model(self, model):
-        pass
-
-    def set_reduction_model(self, model):
         pass
 
 
 class TimeSeriesMongoDataBase(TimeSeriesDataBase):
 
-    def __init__(self, db_name='lightcurves', url='localhost', port=27017):
+    def __init__(self, batch_size=128*10**9, db_name='lightcurves', url='localhost', port=27017):
         client = MongoClient(url, port)
         self.db = client[db_name]
+        self.collection_names = ['macho']
+        self._batch_size = batch_size
+        self._current_catalog = None
+        self._current_cursor = None
 
-    def setup(self, collection_names=None):
-        if collection_names is None:
-            collection_names = []
-        existing_collection_names = self.db.collection_names()
-        collection_names = list(set(existing_collection_names + collection_names))
+    @property
+    def catalog_names(self):
+        collection_names = self.db.collection_names()
         if 'system.indexes' in collection_names:
             collection_names.remove('system.indexes')
+        return collection_names
+
+    def setup(self):
+        collection_names = self.collection_names
+        existing_collection_names = self.catalog_names
+        collection_names = list(set(existing_collection_names + collection_names))
         for collection_name in collection_names:
             collection = self.db[collection_name]
             collection.create_index([("id", pymongo.ASCENDING)], background=True, unique=True)
@@ -294,6 +295,7 @@ class TimeSeriesMongoDataBase(TimeSeriesDataBase):
         for document in cursor:
             time_series_list.append(DataMultibandTimeSeries.from_dict(document))
         return time_series_list
+
     def metadata_search(self, catalog_name, **kwargs):
         query = []
         for key, value in kwargs.iteritems():
@@ -339,27 +341,18 @@ class TimeSeriesMongoDataBase(TimeSeriesDataBase):
     def get_reduced_vector(self, catalog_name, id_):
         return self.get_one_dict(catalog_name, id_)['reduced']
 
+    def reset_cursor(self):
+        self._current_catalog = None
+
+    def next_batch(self):
+        if self._current_catalog is None:
+            self._current_catalog
+
+
+
     def get_original_bands(self, catalog_name, id_):
         bands_dict = self.get_one_dict(catalog_name, id_)['bands']
         return DataMultibandTimeSeries.extract_bands_dict(bands_dict)
-
-    def get_clustering_model(self):
-        binary_data = self.db['models'].find_one({'model': 'clustering'})['bin-data']
-        return pickle.loads(binary_data)
-
-    def get_reduction_model(self):
-        binary_data = self.db['models'].find_one({'model': 'reduction'})['bin-data']
-        return pickle.loads(binary_data)
-
-    def set_clustering_model(self, model):
-        binary_data = pickle.dumps(model)
-        document = {'model': 'clustering', 'bin-data': Binary(binary_data)}
-        self.db['models'].replace_one({'model': 'clustering'}, document)
-
-    def set_reduction_model(self, model):
-        binary_data = pickle.dumps(model)
-        document = {'model': 'reduction', 'bin-data': Binary(binary_data)}
-        return self.db['models'].replace_one({'model': 'reduction'}, document, True)
 
 
 class MultibandTimeSeries(object):

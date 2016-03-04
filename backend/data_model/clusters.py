@@ -26,6 +26,10 @@ class ClustersDataBase:
         pass
 
     @abstractmethod
+    def setup(self):
+        pass
+
+    @abstractmethod
     def store_clusters(self):
         pass
 
@@ -52,7 +56,6 @@ class ClustersDataBase:
     @abstractmethod
     def get_cluster(self, cluster_id):
         pass
-
 
 class ClustersMongoDataBase(ClustersDataBase):
     __metaclass__ = ABCMeta
@@ -85,6 +88,9 @@ class ClustersMongoDataBase(ClustersDataBase):
         client = MongoClient(url, port)
         self.db = client[db_name]
         self._info_loaded = False
+
+    def setup(self):
+        pass
 
     def store_clusters(self, clusters_list):
         if len(self.db.collection_names()) != 0:
@@ -153,7 +159,6 @@ class ClustersMongoDataBase(ClustersDataBase):
 
     def _get_cluster_data_points_cursor(self, cluster_id):
         return self.db[str(cluster_id)].find().sort('id', pymongo.ASCENDING)
-
 
 class Cluster:
 
