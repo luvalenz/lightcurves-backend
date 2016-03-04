@@ -47,16 +47,18 @@ class IncrementalClustering:
 
 class Birch(IncrementalClustering):
 
-    def __init__(self, threshold, cluster_distance_measure='d0', cluster_size_measure='r', n_global_clusters=50, branching_factor=50):
+    def __init__(self, threshold, cluster_distance_measure='d0', cluster_size_measure='r', n_global_clusters=50, branching_factor=50, remove_outliers=False, outlier_rate=0.1):
         self.branching_factor = branching_factor
         self.threshold = threshold
         self.cluster_size_measure = cluster_size_measure
         self.cluster_distance_measure = cluster_distance_measure
         self._data_ids = []
         self.root = BirchNode(self, True)
-        self._local_labels = None
-        self._global_labels = None
+        self._locally_labeled_data = None
+        self._globally_labeled_data = None
         self.n_global_clusters = n_global_clusters
+        self._remove_outliers = remove_outliers
+        self._outlier_rate = outlier_rate
 
     @property
     def count(self):
@@ -67,32 +69,34 @@ class Birch(IncrementalClustering):
         return result
 
     def add_many_time_series(self, time_series_list):
-        self._local_labels = None
-        self._global_labels = None
+        self._locally_labeled_data = None
+        self._globally_labeled_data = None
         for time_series in time_series_list:
-            self._try_add_time_series(time_series)
+            self._try_add_one_time_series(time_series)
 
     def get_cluster_list(self, **kwargs):
         global_clusters = False
-        if 'clusters_type' in kwargs and kwargs['clusters_type'] == 'global':
+        if 'mode' in kwargs and kwargs['mode'] == 'global':
             global_clusters = True
         if global_clusters:
-            labels = self.global_labels
+            labeled_data = self.globally_labeled_data
             unique_labels = self.unique_global_labels
             centers = self.global_centers
         else:
-            labels = self.local_labels
+            labeled_data = self.locally_labeled_data
             unique_labels = self.unique_local_labels
             centers = self.centers
         cluster_list = []
+        data, labels = labeled_data.T
+        labels = labels.astype(np.float32).astype(np.int32)
         for center, label in itertools.izip(centers, unique_labels):
-            lc_indices = labels[np.where(labels[:,1] == label)[0]][:,0]
+            lc_indices = data[np.where(labels == label)[0]].tolist()
             cluster_list.append(lc_indices)
-        return lc_indices
+        return centers, cluster_list
 
     def is_fitted(self, **kwargs):
         global_clusters = False
-        if 'clusters_type' in kwargs and kwargs['clusters_type'] == 'global':
+        if 'mode' in kwargs and kwargs['mode'] == 'global':
             global_clusters = True
         if global_clusters:
             return self.has_global_labels
@@ -101,16 +105,16 @@ class Birch(IncrementalClustering):
 
     def fit(self, **kwargs):
         global_clusters = False
-        if 'clusters_type' in kwargs and kwargs['clusters_type'] == 'global':
+        if 'mode' in kwargs and kwargs['mode'] == 'global':
             global_clusters = True
         if global_clusters:
             self._do_global_clustering()
         else:
-            return self.has_local_labels
+            self._generate_labels()
 
     def get_number_of_clusters(self, **kwargs):
         global_clusters = False
-        if 'clusters_type' in kwargs and kwargs['clusters_type'] == 'global':
+        if 'mode' in kwargs and kwargs['mode'] == 'global':
             global_clusters = True
         if global_clusters:
             return self.number_of_global_labels
@@ -119,23 +123,23 @@ class Birch(IncrementalClustering):
 
     @property
     def has_local_labels(self):
-        return self._local_labels is not None
+        return self._locally_labeled_data is not None
 
     @property
     def has_global_labels(self):
-        return self._global_labels is not None
+        return self._globally_labeled_data is not None
 
     @property
-    def local_labels(self):
+    def locally_labeled_data(self):
         if not self.has_local_labels:
             self._generate_labels()
-        return self._local_labels
+        return self._locally_labeled_data
 
     @property
-    def global_labels(self):
+    def globally_labeled_data(self):
         if not self.has_global_labels:
             self._do_global_clustering()
-        return self._global_labels
+        return self._globally_labeled_data
 
     @property
     def centers(self):
@@ -171,42 +175,51 @@ class Birch(IncrementalClustering):
     def unique_local_labels(self):
         if not self.has_local_labels:
             self._generate_labels()
-        return list(set(self.local_labels[:,1].tolist()))
+        return list(set(self.locally_labeled_data[:,1].astype(np.float32)
+                        .astype(np.int32).tolist()))
 
     @property
     def unique_global_labels(self):
         if not self.has_global_labels:
             self._do_global_clustering()
-        return list(set(self.global_labels[:,1].tolist()))
-
+        return list(set(self.globally_labeled_data[:,1].astype(np.float32)
+                        .astype(np.int32).tolist()))
     @property
     def number_of_local_labels(self):
         if not self.has_local_labels:
-            self._generate_labels()
+            return None
         return len(self.unique_local_labels)
 
     @property
     def number_of_global_labels(self):
         if not self.has_global_labels:
-            self._do_global_clustering()
+            return None
         return len(self.unique_global_labels)
 
     def _generate_labels(self):
         clusters = self.root.get_clusters()
-        labels = np.empty((0,2))
-        next_label = 0
         counts = []
         squared_norms = []
         linear_sums = []
+        clusters_data_ids = []
         for cluster in clusters:
-            indices = cluster.get_indices()
+            data_ids = cluster.get_indices()
             counts.append(cluster.count)
             squared_norms.append(cluster.squared_norm)
             linear_sums.append(cluster.linear_sum)
-            cluster_labels = np.column_stack((indices, next_label*np.ones(len(indices))))
-            labels = np.vstack((labels, cluster_labels))
-            next_label += 1
-        self._local_labels = labels
+            clusters_data_ids.append(data_ids)
+        counts = np.array(counts)
+        linear_sums = np.array(linear_sums)
+        squared_norms = np.array(squared_norms)
+        if self._remove_outliers:
+            count_avg = np.mean(counts)
+            count_rate = counts / count_avg
+            not_outliers = np.where(count_rate > self._outlier_rate)[0]
+            counts =
+
+
+
+        self._locally_labeled_data = labels
         self._counts = np.array(counts)
         self._linear_sums = np.vstack(linear_sums)
         self._squared_norms = np.array(squared_norms)
@@ -254,12 +267,15 @@ class Birch(IncrementalClustering):
             distances[j_indices] = np.inf
             n_global_clusters -= 1
         indices_list = list(indices_dict.values())
+        #print(indices_list)
         self._build_global_clusters(indices_list)
 
     def _build_global_clusters(self, indices_list):
         global_centers = []
         global_labels = []
         next_global_label = 0
+        labels = self._locally_labeled_data[:, 1].astype(np.float32).astype(np.int32)
+        #print labels
         for cluster_indices in indices_list:
             linear_sum = np.sum(self.linear_sums[cluster_indices], axis=0)
             count = np.sum(self.counts[cluster_indices])
@@ -267,15 +283,17 @@ class Birch(IncrementalClustering):
             global_centers.append(center)
             index_mask = []
             for index in cluster_indices:
-                index_mask.append(self._local_labels[:,1] == index)
+                index_mask.append(labels == index)
+
             index_mask = np.vstack(index_mask)
             index_mask = np.any(index_mask, axis=0)
-            data_indices = self._local_labels[index_mask, 0]
+            data_indices = self._locally_labeled_data[index_mask, 0]
             global_cluster_labels = np.column_stack((data_indices, next_global_label*np.ones(len(data_indices))))
             global_labels.append(global_cluster_labels)
             next_global_label += 1
         self._global_centers = np.vstack(global_centers)
-        self._global_labels = np.vstack(global_labels)
+        self._globally_labeled_data = np.vstack(global_labels)
+        #print self._globally_labeled_data
 
     def violates_threshold(self, count, linear_sum, squared_norm):
         return self.cluster_size(count, linear_sum, squared_norm) >= self.threshold
@@ -296,14 +314,16 @@ class Birch(IncrementalClustering):
         else:
             return Birch.d0(count_1, linear_sum_1, squared_norm1, count_2, linear_sum_2, squared_norm2)
 
-    def _try_add_time_series(self, time_series):
+    def _try_add_one_time_series(self, time_series):
         reduced_vector = time_series.reduced_vector
         id_ = time_series.id
-        if id_ in self._data_ids:
-            if reduced_vector is not None and len(reduced_vector) != 0:
-                self._add_data_point(id_, reduced_vector)
+        if id_ not in self._data_ids:
+            if reduced_vector is not None and len(reduced_vector):
+                self._add_data_point(id_, np.array(reduced_vector))
 
     def _add_data_point(self, id_, data_point):
+        self._globally_labeled_data = None
+        self._locally_labeled_data = None
         squared_norm = np.linalg.norm(data_point)**2
         data_point_cf = data_point, squared_norm
         self._data_ids.append(id_)
@@ -597,7 +617,6 @@ class ClusteringFeature:
         self.count = count
         self.node = None
 
-
     @property
     def cf_parent(self):
         if self.node is None:
@@ -791,16 +810,16 @@ class IncrementalPCA(IncrementalDimensionalityReduction):
             self.n = len(x)
         else:
             self.cov, self.mean, self.std = IncrementalPCA.cov_stack(x, self.mean, self.cov, self.std, self.n)
-            if np.isnan(np.sum(self.cov)):
-                print(self.cov)
+            # if np.isnan(np.sum(self.cov)):
+            #     print(self.cov)
             n = self.n + len(x)
 
-    def _extract_feature_matrix(self, time_series_list, only_absents=False):
+    def _extract_feature_matrix(self, time_series_list, only_absents):
         ids = []
         feature_vectors = []
         for time_series in time_series_list:
             id_ = time_series.id
-            feature_vector = time_series.feature_vector
+            feature_vector = time_series.reduced_vector
             if only_absents and id_ in self.data_ids:
                 continue
             if len(feature_vector) != 0:
