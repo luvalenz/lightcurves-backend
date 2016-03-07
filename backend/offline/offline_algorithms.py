@@ -215,11 +215,16 @@ class Birch(IncrementalClustering):
             count_avg = np.mean(counts)
             count_rate = counts / count_avg
             not_outliers = np.where(count_rate > self._outlier_rate)[0]
-            counts =
-
-
-
-        self._locally_labeled_data = labels
+            counts = counts[not_outliers]
+            linear_sums = linear_sums[not_outliers]
+            squared_norms = squared_norms[not_outliers]
+            clusters_data_ids = [ids for i, ids in itertools.izip(xrange(len(clusters_data_ids)), clusters_data_ids)
+                                 if i in not_outliers]
+        labels = []
+        for i, ids in itertools.izip(xrange(len(clusters_data_ids)), clusters_data_ids):
+            cluster_labels = np.column_stack((ids, i*np.ones(len(ids))))
+            labels.append(cluster_labels)
+        self._locally_labeled_data = np.vstack(labels)
         self._counts = np.array(counts)
         self._linear_sums = np.vstack(linear_sums)
         self._squared_norms = np.array(squared_norms)
