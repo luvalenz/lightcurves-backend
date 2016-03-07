@@ -48,7 +48,7 @@ class IncrementalClustering:
 class Birch(IncrementalClustering):
 
     def __init__(self, threshold, cluster_distance_measure='d0', cluster_size_measure='r',
-                 n_global_clusters=50, remove_outliers=False, outlier_rate=0.1, branching_factor=50):
+                 n_global_clusters=50, remove_outliers=False, outlier_rate=1, branching_factor=50):
         self.branching_factor = branching_factor
         self.threshold = threshold
         self.cluster_size_measure = cluster_size_measure
@@ -573,7 +573,9 @@ class BirchNode:
         merger1 = cfs[seeds_indices[1]]
         if merger0 is splitted_cf0 and merger1 is splitted_cf1 or merger0 is splitted_cf1 and merger1 is splitted_cf0:
             return
-        new_node = BirchNode(self.birch, self.is_leaf)
+        if merger0.child.is_leaf != merger0.child.is_leaf:
+            return
+        new_node = BirchNode(self.birch, merger0.child.is_leaf)
         new_cf = NonLeafClusteringFeature(self.birch, new_node)
         mergers_cfs = merger0.child._clustering_features + merger1.child._clustering_features
         for cf in mergers_cfs:

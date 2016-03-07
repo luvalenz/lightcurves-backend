@@ -25,6 +25,7 @@ def extract_feature_matrix(database, id_list):
 def plot_cluster_list(centers, clusters, database):
     plt.plot(centers[:, 0], centers[:, 1], 'x')
     colors = plt.cm.Spectral(np.linspace(0, 1, len(clusters)))
+    np.random.shuffle(colors)
     for cluster_indices, col in zip(clusters, colors):
         cluster_data = extract_feature_matrix(database, cluster_indices)
         plt.plot(cluster_data[:, 0], cluster_data[:, 1], 'o', markerfacecolor=col)
@@ -33,8 +34,8 @@ def plot_cluster_list(centers, clusters, database):
 mongodb = TimeSeriesMongoDataBase('lightcurves')
 lightcurves = mongodb.find_many('macho', {})
 
-threshold = 3
-birch = Birch(threshold, 'd1', 'r', 4)
+threshold = 0.75
+birch = Birch(threshold, 'd1', 'r', 10, False, 1)
 
 birch.add_many_time_series(lightcurves)
 

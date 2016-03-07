@@ -35,6 +35,7 @@ def plot_clustering(centers, labels, unique_labels, X):
 def plot_cluster_list(centers, clusters, df):
     plt.plot(centers[:, 0], centers[:, 1], 'x')
     colors = plt.cm.Spectral(np.linspace(0, 1, len(clusters)))
+    np.random.shuffle(colors)
     for cluster_indices, col in zip(clusters, colors):
         cluster_data = df.loc[cluster_indices].values
         plt.plot(cluster_data[:, 0], cluster_data[:, 1], 'o', markerfacecolor=col)
@@ -82,8 +83,8 @@ df = pd.DataFrame(X, index=[hex(i) for i in range(len(X))])
 #print(df)
 
 
-threshold = 2
-brc = Birch(threshold, 'd1', 'r', 4, True, 1)
+threshold = 0.01
+brc = Birch(threshold, 'd1', 'r', 5, False, 1, 2)
 add_data_frame(brc, df.iloc[0:n*5])
 test(brc, df)
 
