@@ -1,0 +1,41 @@
+{
+  "clustering_algorithms":
+          [
+            {
+              "type": "birch",
+              "parameters": [1, 2, 3]
+            }
+          ],
+  "reduction_algorithms":
+          [
+            {
+              "type": "ipca",
+              "parameters" : [1, 2, 3]
+            }
+          ],
+  "time_series_databases":
+          [
+            {
+              "type": "mongodb",
+              "parameters": [1, 2, 3]
+            },
+            { "type": "macho",
+              "parameters": []}
+          ],
+  "clustering_databases":
+          [
+            {
+              "type": "mongodb",
+              "parameters": [1, 2, 3]
+            }
+          ],
+  "serializing_databases":
+          [
+            {
+              "type": "mongodb",
+              "parameters":[1,2,3]
+            }
+          ]
+ }
+
+

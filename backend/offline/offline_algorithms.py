@@ -47,7 +47,8 @@ class IncrementalClustering:
 
 class Birch(IncrementalClustering):
 
-    def __init__(self, threshold, cluster_distance_measure='d0', cluster_size_measure='r', n_global_clusters=50, branching_factor=50, remove_outliers=False, outlier_rate=0.1):
+    def __init__(self, threshold, cluster_distance_measure='d0', cluster_size_measure='r',
+                 n_global_clusters=50, remove_outliers=False, outlier_rate=0.1, branching_factor=50):
         self.branching_factor = branching_factor
         self.threshold = threshold
         self.cluster_size_measure = cluster_size_measure
@@ -195,6 +196,26 @@ class Birch(IncrementalClustering):
         if not self.has_global_labels:
             return None
         return len(self.unique_global_labels)
+
+    # def _generate_labels(self):
+    #     clusters = self.root.get_clusters()
+    #     labels = np.empty((0,2))
+    #     next_label = 0
+    #     counts = []
+    #     squared_norms = []
+    #     linear_sums = []
+    #     for cluster in clusters:
+    #         indices = cluster.get_indices()
+    #         counts.append(cluster.count)
+    #         squared_norms.append(cluster.squared_norm)
+    #         linear_sums.append(cluster.linear_sum)
+    #         cluster_labels = np.column_stack((indices, next_label*np.ones(len(indices))))
+    #         labels = np.vstack((labels, cluster_labels))
+    #         next_label += 1
+    #     self._locally_labeled_data = labels
+    #     self._counts = np.array(counts)
+    #     self._linear_sums = np.vstack(linear_sums)
+    #     self._squared_norms = np.array(squared_norms)
 
     def _generate_labels(self):
         clusters = self.root.get_clusters()
