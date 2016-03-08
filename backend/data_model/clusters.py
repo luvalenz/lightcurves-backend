@@ -4,6 +4,8 @@ from abc import ABCMeta, abstractmethod, abstractproperty
 from pymongo import MongoClient
 import numpy as np
 import pymongo
+from scipy.spatial.distance import cdist
+import itertools
 
 
 class ClustersDataBase:
@@ -42,7 +44,7 @@ class ClustersDataBase:
         pass
 
     @abstractmethod
-    def get_number_of_data(self, cluster_id):
+    def get_count(self, cluster_id):
         pass
 
     @abstractmethod
@@ -107,8 +109,8 @@ class ClustersMongoDataBase(ClustersDataBase):
         cluster_collection.create_index([("distance", pymongo.ASCENDING)])
         info_collection = self.db['info']
         info = cluster.get_info()
-        info['id'] = str(index)
-        info_collection.insert_one(cluster.get_info())
+        info['id'] = index
+        info_collection.insert_one(info)
 
     def _load_info(self):
         self._info_loaded = True
@@ -160,6 +162,7 @@ class ClustersMongoDataBase(ClustersDataBase):
     def _get_cluster_data_points_cursor(self, cluster_id):
         return self.db[str(cluster_id)].find().sort('id', pymongo.ASCENDING)
 
+
 class Cluster:
 
     @property
@@ -186,20 +189,25 @@ class Cluster:
     def center(self):
         return self._center
 
-    def __init__(self, id_, data_ids, distances, data_points, center):
-        order = np.argsort[distances]
+    def __init__(self, data_ids, data_points, center, distances=None, id_=None):
+        if distances is None:
+            distances = cdist(np.matrix(center), np.matrix(data_points))[0]
+        order = np.argsort(distances)
         self._center = center
         self._data_points = np.array(data_points[order])
-        self._distances = np.array(np.array(distances[order]))
+        self._distances = np.array(distances[order])
+        data_ids = np.array(data_ids)
         self._data_point_ids = list(data_ids[order])
         self._id = id_
 
     @staticmethod
     def from_pandas_data_frame(dataframe, center):
         data_points = dataframe.ix[:, dataframe.columns != 'distance'].values
-        distances = dataframe['distances'].values
         data_indices = dataframe.index.values
-        return Cluster(data_indices, distances, data_points, center)
+        distances = None
+        if 'distances' in dataframe:
+            distances = dataframe['distances'].values
+        return Cluster(data_indices, data_points, center, distances)
 
     @staticmethod
     def from_list_of_dicts(data_point_list, id_=None, center=None):
@@ -209,8 +217,26 @@ class Cluster:
         for data_point_dictionary in data_point_list:
             data_ids.append(data_point_dictionary['id'])
             values.append(data_point_dictionary['values'])
-            distances.append(data_point_dictionary['distance'])
-        return Cluster(id_, data_ids, distances, values, center)
+            distances.append(data_point_dictionary['distances'])
+        return Cluster(data_ids, values, center, id_)
+
+    @staticmethod
+    def from_time_series_sequence(time_series_sequence, center):
+        ids = []
+        values = []
+        for time_series in time_series_sequence:
+            reduced_vector = time_series.reduced_vector
+            if reduced_vector is not None:
+                values.append(time_series.reduced_vector)
+                ids.append(time_series.id)
+        values = np.vstack(values)
+        return Cluster(ids, values, center)
+
+    def to_list_of_dicts(self):
+        list_of_dicts = []
+        for id_, values, distance in itertools.izip(self._data_point_ids, self._data_points, self._distances):
+            list_of_dicts.append({'id': id_, 'values': list(values), 'distance': distance})
+        return list_of_dicts
 
 
     def get_data_points_collection(self):
@@ -221,7 +247,7 @@ class Cluster:
         return list_of_dicts
 
     def get_info(self):
-        return {'id': self.id, 'radius': self.radius, 'count': self.count, 'center': self.center}
+        return {'id': self.id, 'radius': self.radius, 'count': self.count, 'center': list(self.center)}
 
 
 

@@ -492,7 +492,8 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
 
     @property
     def reduced_vector(self):
-        return self._reduced_vector
+        rv = self._reduced_vector
+        return np.array(rv) if rv is not None else None
 
     @property
     def times(self):

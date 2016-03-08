@@ -8,6 +8,7 @@ import scipy.spatial.distance as dist
 import os
 import pickle
 import operator
+import statsmodels.robust.scale as scale
 
 #python 2
 
@@ -233,8 +234,8 @@ class Birch(IncrementalClustering):
         linear_sums = np.array(linear_sums)
         squared_norms = np.array(squared_norms)
         if self._remove_outliers:
-            count_avg = np.mean(counts)
-            count_rate = counts / count_avg
+            count_median = np.mean(counts)
+            count_rate = counts / count_median
             not_outliers = np.where(count_rate > self._outlier_rate)[0]
             counts = counts[not_outliers]
             linear_sums = linear_sums[not_outliers]

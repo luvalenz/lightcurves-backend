@@ -5,8 +5,9 @@ import pandas as pd
 import numpy as np
 from offline_algorithms import Birch, IncrementalPCA as IPCA
 from ..data_model.time_series import TimeSeriesMongoDataBase, MachoFileDataBase
-from ..data_model.clusters import ClustersMongoDataBase
+from ..data_model.clusters import ClustersMongoDataBase, Cluster
 from ..data_model.serializing import SerializingMongoDatabase
+
 
 
 class OfflineInterface(object):
@@ -102,8 +103,13 @@ class OfflineInterface(object):
         #update reduced model
         #recalculate ALL (important)
 
-    def cluster_all(self, time_series_database_index, cluster_database_index=0):
-        pass
+    def cluster_all(self, time_series_database_index, cluster_database_index=0,
+                    serializing_db_index=0, clustering_model_index=0, ):
+        clusters_db = self.get_clustering_database(cluster_database_index)
+        centers, data_ids_clusters = self.get_clustering_model(serializing_db_index,
+                                                               clustering_model_index)
+
+
 
     def copy_database_data(self, source_database_index, destination_database_index):
         pass

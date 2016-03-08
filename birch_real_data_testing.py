@@ -2,6 +2,7 @@ __author__ = 'lucas'
 
 from backend.data_model.time_series import DataMultibandTimeSeries
 from backend.data_model.time_series import TimeSeriesMongoDataBase
+from backend.data_model.clusters import Cluster
 from backend.offline.offline_algorithms import Birch
 import numpy as np
 import pandas as pd
@@ -31,12 +32,23 @@ def plot_cluster_list(centers, clusters, database):
         plt.plot(cluster_data[:, 0], cluster_data[:, 1], 'o', markerfacecolor=col)
     plt.show()
 
+
+def plot_lightcurves(lightcurve_list):
+    reduced_features = []
+    for lc in lightcurve_list:
+        if lc.reduced_vector is not None and len(lc.reduced_vector) > 1:
+            reduced_features.append(lc.reduced_vector)
+    reduced_features = np.vstack(reduced_features)
+    plt.plot(reduced_features[:, 0], reduced_features[:, 1], '*')
+    plt.show()
+
 mongodb = TimeSeriesMongoDataBase('lightcurves')
 lightcurves = mongodb.find_many('macho', {})
 
-threshold = 0.75
-birch = Birch(threshold, 'd1', 'r', 10, False, 1)
+plot_lightcurves(lightcurves)
 
+threshold = 0.75
+birch = Birch(threshold, 'd1', 'r', 10, True, 1)
 birch.add_many_time_series(lightcurves)
 
 
@@ -50,3 +62,10 @@ plot_cluster_list(local_centers, local_clusters, mongodb)
 
 global_centers, global_clusters = birch.get_cluster_list(mode='global')
 plot_cluster_list(global_centers, global_clusters, mongodb)
+
+
+clusters = []
+for i, center, cluster in zip(range(len(global_centers)),
+                                     global_centers, global_clusters):
+    time_series_list = mongodb.get_many('macho', cluster)
+    clusters.append(Cluster.from_time_series_sequence(str(i), time_series_list, center))
