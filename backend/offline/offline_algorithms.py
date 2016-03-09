@@ -328,7 +328,7 @@ class Birch(IncrementalClustering):
             distances[j_indices] = np.inf
             n_global_clusters -= 1
         indices_list = list(indices_dict.values())
-        #print(indices_list)
+        print(indices_list)
         self._build_global_clusters(indices_list)
 
     def _build_global_clusters(self, indices_list):

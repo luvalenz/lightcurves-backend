@@ -11,9 +11,9 @@ import string
 
 
 def extract_feature_matrix(database, id_list):
-    time_series_list = database.get_many('macho', id_list)
+    time_series_iterator = database.get_many(id_list, 'macho', False)
     feature_vectors = []
-    for time_series in time_series_list:
+    for time_series in time_series_iterator:
         feature_vector = time_series.reduced_vector
         if len(feature_vector) != 0:
             feature_vectors.append(feature_vector)
@@ -43,12 +43,18 @@ def plot_lightcurves(lightcurve_list):
     plt.show()
 
 mongodb = MongoTimeSeriesDataBase('lightcurves')
-lightcurves = mongodb.find_many('macho', {})
+lightcurves_iterator = mongodb.find_many('macho', False, {})
+
+lightcurves = []
+
+for lightcurve in lightcurves_iterator:
+    lightcurves.append(lightcurve)
 
 plot_lightcurves(lightcurves)
 
 threshold = 0.75
-birch = Birch(threshold, True, n_global_clusters=10, cluster_distance_measure='d1', 'r', branching_factor=1)
+remove_outliers = True
+birch = Birch(threshold, remove_outliers, True, 10)
 birch.add_many_time_series(lightcurves)
 
 
@@ -64,8 +70,8 @@ global_centers, global_clusters = birch.get_cluster_list(mode='global')
 plot_cluster_list(global_centers, global_clusters, mongodb)
 
 
-clusters = []
-for i, center, cluster in zip(range(len(global_centers)),
-                                     global_centers, global_clusters):
-    time_series_list = mongodb.get_many('macho', cluster)
-    clusters.append(Cluster.from_time_series_sequence(time_series_list, center))
+# clusters = []
+# for i, center, cluster in zip(range(len(global_centers)),
+#                                      global_centers, global_clusters):
+#     time_series_list = mongodb.get_many(cluster, 'macho')
+#     clusters.append(Cluster.from_time_series_sequence(time_series_list, center))
