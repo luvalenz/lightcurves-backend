@@ -48,7 +48,7 @@ lightcurves = mongodb.find_many('macho', {})
 plot_lightcurves(lightcurves)
 
 threshold = 0.75
-birch = Birch(threshold, 'd1', 'r', 10, True, 1)
+birch = Birch(threshold, True, n_global_clusters=10, cluster_distance_measure='d1', 'r', branching_factor=1)
 birch.add_many_time_series(lightcurves)
 
 

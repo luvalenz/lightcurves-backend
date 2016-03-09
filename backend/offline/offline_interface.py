@@ -6,7 +6,7 @@ import numpy as np
 from offline_algorithms import Birch, IncrementalPCA as IPCA
 from ..data_model.time_series import MongoTimeSeriesDataBase, MachoFileDataBase
 from ..data_model.clusters import ClustersMongoDataBase, Cluster
-from ..data_model.serializing import SerializingMongoDatabase
+from ..data_model.serializations import SerializationMongoDatabase
 
 
 
@@ -33,7 +33,7 @@ class OfflineInterface(object):
     def setup(self, time_series_db_index=0, clustering_db_index=0, serializing_db_index=0):
         time_series_db = self.get_time_series_databse(time_series_db_index)
         clustering_db = self.get_clustering_database(clustering_db_index)
-        serializing_db = self.get_serializing_database(serializing_db_index)
+        serializing_db = self.get_serialization_database(serializing_db_index)
         time_series_db.setup()
         clustering_db.setup()
         serializing_db.setup()
@@ -43,7 +43,7 @@ class OfflineInterface(object):
         clustering_db.defragment()
 
     def get_reduction_model(self, serializing_db_index=0, model_index=0):
-        serializing_db = self.get_serializing_database(serializing_db_index)
+        serializing_db = self.get_serialization_database(serializing_db_index)
         if serializing_db.has_reduction_model:
             return serializing_db.reduction_model
         else:
@@ -55,7 +55,7 @@ class OfflineInterface(object):
             return Model(**parameters)
 
     def get_clustering_model(self, serializing_db_index=0, model_index=0):
-        serializing_db = self.get_serializing_database(serializing_db_index)
+        serializing_db = self.get_serialization_database(serializing_db_index)
         if serializing_db.has_clustering_model:
             return serializing_db.clustering_model
         else:
@@ -84,7 +84,7 @@ class OfflineInterface(object):
             Database = ClustersMongoDataBase
         return Database(**parameters)
 
-    def get_serializing_database(self, index):
+    def get_serialization_database(self, index):
         db_info = self.config['serializing_databases'][index]
         model_type = db_info['type']
         parameters = db_info['parameters']
@@ -100,20 +100,40 @@ class OfflineInterface(object):
             destination_db.add_many(batch)
 
     def calculate_all_features(self, database_index):
-        pass
+        time_series_db = self.get_time_series_database(database_index)
+        batch_iterable = time_series_db.get_all()
+        for batch in batch_iterable:
+            updated = []
+            for time_series in batch:
+                if self.feature_vector is None or len(self.feature_vector) == 0:
+                    time_series.calculate_features()
+                    updated.append(time_series)
+            time_series_db.update_many(updated)
 
-    def reduce_all(self, serializing_db_index=0, reduction_model_index=0, time_series_db_index=0):
-        reduction_model = self.get_reduction_model(serializing_db_index, reduction_model_index)
+    def reduce_all(self, serialization_db_index=0, reduction_model_index=0, time_series_db_index=0):
         time_series_db = self.get_time_series_database(time_series_db_index)
-        reduction_model.add_
-        #update reduced model
-        #recalculate ALL (important)
+        batch_iterable = time_series_db.get_all()
+        reduction_model = self.get_reduction_model(serialization_db_index, reduction_model_index)
+        serialization_db = self.get_serialization_database(serialization_db_index)
+        for time_series_list in batch_iterable:
+            reduction_model.add_transform_time_series(time_series_list)
+            time_series_db.update_many(time_series_list)
+        serialization_db.store_reduction_model(reduction_model)
 
-    def cluster_all(self, time_series_database_index, cluster_database_index=0,
-                    serializing_db_index=0, clustering_model_index=0, ):
-        clusters_db = self.get_clustering_database(cluster_database_index)
-        centers, data_ids_clusters = self.get_clustering_model(serializing_db_index,
-                                                               clustering_model_index)
+    def cluster_all(self, time_series_database_index=0,
+                    serialization_db_index=0, clustering_model_index=0):
+        time_series_db = self.get_time_series_database(time_series_database_index)
+        clustering_model = self.get_clustering_model(serialization_db_index, clustering_model_index)
+        serialization_db = self.get_serialization_database(serialization_db_index)
+        batch_iterable = time_series_db.get_all()
+        for time_series_list in batch_iterable:
+            clustering_model.add_many_time_series(time_series_list)
+        serialization_db.store_clustering_model(clustering_model)
+
+    def store_all_clusters(self, serialization_db_index=0, clustering_model_index=0, clustering_db_index=0):
+        clustering_model = self.get_clustering_model(serialization_db_index, clustering_model_index)
+        clustering_db = self.get_clustering_database(clustering_db_index)
+        clustering_db.reset_database()
 
 
 

@@ -48,8 +48,8 @@ class IncrementalClustering:
 
 class Birch(IncrementalClustering):
 
-    def __init__(self, threshold, cluster_distance_measure='d0', cluster_size_measure='r',
-                 n_global_clusters=50, remove_outliers=False, branching_factor=50):
+    def __init__(self, threshold, remove_outliers=True, global_clustering=True, n_global_clusters=50,
+                 cluster_distance_measure='d0', cluster_size_measure='r', branching_factor=50):
         self.branching_factor = branching_factor
         self.threshold = threshold
         self.cluster_size_measure = cluster_size_measure
@@ -58,7 +58,8 @@ class Birch(IncrementalClustering):
         self.root = BirchNode(self, True)
         self._locally_labeled_data = None
         self._globally_labeled_data = None
-        self.n_global_clusters = n_global_clusters
+        self._global_clustering = global_clustering
+        self._n_global_clusters = n_global_clusters
         self._remove_outliers = remove_outliers
 
     @property
@@ -76,9 +77,12 @@ class Birch(IncrementalClustering):
             self._try_add_one_time_series(time_series)
 
     def get_cluster_list(self, **kwargs):
-        global_clusters = False
-        if 'mode' in kwargs and kwargs['mode'] == 'global':
-            global_clusters = True
+        global_clusters = self._global_clustering
+        if 'mode' in kwargs:
+            if kwargs['mode'] == 'global':
+                global_clusters = True
+            else:
+                global_clusters = False
         if global_clusters:
             labeled_data = self.globally_labeled_data
             unique_labels = self.unique_global_labels
@@ -96,27 +100,36 @@ class Birch(IncrementalClustering):
         return centers, cluster_list
 
     def is_fitted(self, **kwargs):
-        global_clusters = False
-        if 'mode' in kwargs and kwargs['mode'] == 'global':
-            global_clusters = True
+        global_clusters = self._global_clustering
+        if 'mode' in kwargs:
+            if kwargs['mode'] == 'global':
+                global_clusters = True
+            else:
+                global_clusters = False
         if global_clusters:
             return self.has_global_labels
         else:
             return self.has_local_labels
 
     def fit(self, **kwargs):
-        global_clusters = False
-        if 'mode' in kwargs and kwargs['mode'] == 'global':
-            global_clusters = True
+        global_clusters = self._global_clustering
+        if 'mode' in kwargs:
+            if kwargs['mode'] == 'global':
+                global_clusters = True
+            else:
+                global_clusters = False
         if global_clusters:
             self._do_global_clustering()
         else:
             self._generate_labels()
 
     def get_number_of_clusters(self, **kwargs):
-        global_clusters = False
-        if 'mode' in kwargs and kwargs['mode'] == 'global':
-            global_clusters = True
+        global_clusters = self._global_clustering
+        if 'mode' in kwargs:
+            if kwargs['mode'] == 'global':
+                global_clusters = True
+            else:
+                global_clusters = False
         if global_clusters:
             return self.number_of_global_labels
         else:
@@ -278,7 +291,7 @@ class Birch(IncrementalClustering):
             distances.append(distance)
         distances = np.array(distances)
         n_global_clusters = n_clusters
-        while n_global_clusters > self.n_global_clusters:
+        while n_global_clusters > self._n_global_clusters:
             min_index = np.argmin(distances)
             min_i, min_j = min_index/n_clusters, min_index%n_clusters
             distances[min_index] = np.inf

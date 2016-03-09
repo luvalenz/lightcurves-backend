@@ -32,7 +32,11 @@ class ClustersDataBase:
         pass
 
     @abstractmethod
-    def store_clusters(self):
+    def reset_database(self):
+        pass
+
+    @abstractmethod
+    def store_cluster(self):
         pass
 
     @abstractproperty
@@ -91,22 +95,22 @@ class ClustersMongoDataBase(ClustersDataBase):
         return self._counts
 
     def __init__(self, db_name='clusters', url='localhost', port=27017):
-        client = MongoClient(url, port)
-        self.db = client[db_name]
+        self.client = MongoClient(url, port)
+        self.db_name = db_name
+        self.db = self.client[db_name]
         self._info_loaded = False
 
     def setup(self):
         pass
 
-    def store_clusters(self, clusters_list):
-        if len(self.db.collection_names()) != 0:
-            return
-        for i, cluster in zip(range(len(clusters_list)), clusters_list):
-            self._store_cluster(i, cluster)
+    def reset_database(self):
+        self.client.drop_database()
+        self.db = self.client[self.db_name]
+        self._info_loaded = False
         info_collection = self.db['info']
         info_collection.create_index([("id", pymongo.ASCENDING)])
 
-    def _store_cluster(self, index, cluster):
+    def store_cluster(self, index, cluster):
         document_list = cluster.to_list_of_dicts()
         cluster_collection = self.db[str(index)]
         cluster_collection.insert_many(document_list)
