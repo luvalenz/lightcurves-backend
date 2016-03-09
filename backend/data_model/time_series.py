@@ -16,6 +16,7 @@ from pymongo import MongoClient
 import glob
 import pickle
 from bson.binary import Binary
+import itertools
 
 
 class TimeSeriesDataBase(object):
@@ -40,6 +41,10 @@ class TimeSeriesDataBase(object):
     @abstractmethod
     def get_many(self, id_list, original=True, phase=True, features=True, metadata=True):
         pass
+
+    @abstractmethod
+    def get_all(self):
+        return
 
     @abstractmethod
     def update_one(self, time_series):
@@ -81,13 +86,6 @@ class TimeSeriesDataBase(object):
     def get_reduced_vector(self, id_):
         pass
 
-    @abstractmethod
-    def reset_cursor(self):
-        pass
-
-    @abstractmethod
-    def next_batch(self):
-        pass
 
 class MachoFileDataBase(TimeSeriesDataBase):
 
@@ -162,6 +160,10 @@ class MachoFileDataBase(TimeSeriesDataBase):
             list_of_dicts.append({'bands': bands_dict, 'features': features_dict, 'metadata': metadata_dict, 'id': id_})
         return list_of_dicts
 
+    def get_all(self, n_fields=82):
+        return MachoTimeSeriesIterable(True, self, n_fields)
+
+
     def get_many(self, field, tile, original=True, phase=False, features=True, metadata=True):
         list_of_dicts = self.get_many_dict(field, tile, original, phase, features, metadata)
         list_of_time_series = []
@@ -223,19 +225,13 @@ class MachoFileDataBase(TimeSeriesDataBase):
     def get_reduced_vector(self, id_):
         return None
 
-    def reset_cursor(self):
-        pass
-
-    def next_batch(self):
-        pass
-
     def get_original_bands(self, id_):
         pass
 
 
-class TimeSeriesMongoDataBase(TimeSeriesDataBase):
+class MongoTimeSeriesDataBase(TimeSeriesDataBase):
 
-    def __init__(self, batch_size=128*10**9, db_name='lightcurves', url='localhost', port=27017):
+    def __init__(self, batch_size=3*10**5, db_name='lightcurves', url='localhost', port=27017):
         client = MongoClient(url, port)
         self.db = client[db_name]
         self.collection_names = ['macho']
@@ -266,9 +262,6 @@ class TimeSeriesMongoDataBase(TimeSeriesDataBase):
             results[collection_name] = self.db.command('compact', collection_name)
         return results
 
-    def get_collection(self, catalog_name):
-        return self.db[catalog_name]
-
     def get_one_dict(self, catalog_name, id_):
         collection = self.db[catalog_name]
         return collection.find_one({'id': id_})
@@ -280,21 +273,24 @@ class TimeSeriesMongoDataBase(TimeSeriesDataBase):
         else:
             return None
 
-    def get_many(self, catalog_name, id_list):
-        collection = self.db[catalog_name]
-        cursor = collection.find({'id': {'$in': id_list}})
-        time_series_list = []
-        for document in cursor:
-            time_series_list.append(DataMultibandTimeSeries.from_dict(document))
-        return time_series_list
+    def get_all(self):
+        self.find_many(None, True, {})
 
-    def find_many(self, catalog_name, filter_dict):
-        collection = self.db[catalog_name]
-        cursor = collection.find(filter_dict)
-        time_series_list = []
-        for document in cursor:
-            time_series_list.append(DataMultibandTimeSeries.from_dict(document))
-        return time_series_list
+    def find_many(self, catalog_name, batch, query_dict):
+        if catalog_name is None:
+            catalogs = self.catalog_names
+        else:
+            catalogs = [catalog_name]
+        cursors = []
+        for catalog in catalogs:
+            collection = self.db[catalog]
+            cursor = collection.find(query_dict)
+            cursors.append(cursor)
+        return MongoTimeSeriesIterable(cursors, batch, self._batch_size)
+
+    def get_many(self, id_list, catalog_name=None, batch=True):
+        query = {'id': {'$in': id_list}}
+        return self.find_many(catalog_name, batch, query)
 
     def metadata_search(self, catalog_name, **kwargs):
         query = []
@@ -340,15 +336,6 @@ class TimeSeriesMongoDataBase(TimeSeriesDataBase):
 
     def get_reduced_vector(self, catalog_name, id_):
         return self.get_one_dict(catalog_name, id_)['reduced']
-
-    def reset_cursor(self):
-        self._current_catalog = None
-
-    def next_batch(self):
-        if self._current_catalog is None:
-            self._current_catalog
-
-
 
     def get_original_bands(self, catalog_name, id_):
         bands_dict = self.get_one_dict(catalog_name, id_)['bands']
@@ -584,10 +571,10 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
                                                              band_values, band_errors, band_phase)
 
     def _set_features(self, feature_dict):
-        self._feature_dictionary = feature_dict.copy()
+        self._feature_dictionary = feature_dict.copy() if feature_dict is not None else None
 
     def _set_metadata(self, metadata_dict):
-        self._metadata = metadata_dict.copy()
+        self._metadata = metadata_dict.copy() if metadata_dict is not None else None
 
     def set_reduced(self, reduced_vector):
         self._reduced_vector = list(reduced_vector) if reduced_vector is not None else None
@@ -781,6 +768,131 @@ class TimeSeriesBand(object):
         return np.column_stack((self.times, self.values, self.errors))
 
 
+class TimeSeriesIterable(object):
+
+    __metaclass__ = ABCMeta
+
+    @abstractmethod
+    def __init__(self, batch= True, batch_size=3*10**5):
+        pass
+
+    @abstractmethod
+    def __len__(self):
+        pass
+
+    @abstractmethod
+    def __iter__(self):
+        pass
+
+    @abstractmethod
+    def next(self):
+        pass
+
+    @abstractmethod
+    def rewind(self):
+        pass
+
+
+class MongoTimeSeriesIterable(TimeSeriesIterable):
+
+    def __init__(self, cursors, batch=True, batch_size=3*10**5):
+        self._batch = batch
+        self._batch_size = batch_size
+        self._cursors = [cursor.clone() for cursor in cursors]
+        self._current_cursor_index = 0
+
+    def __len__(self):
+        length = 0
+        for cursor in self._cursors:
+            length += cursor.count()
+        return length
+
+    def __iter__(self):
+        return self
+
+    def next_unit(self):
+        while True:
+            if self._current_cursor_index >= len(self._cursors):
+                raise StopIteration
+            try:
+                time_series_dict = self._current_cursor.next()
+                return DataMultibandTimeSeries.from_dict(time_series_dict)
+            except StopIteration:
+                self._current_cursor_index += 1
+
+    def next_batch(self):
+        time_series_batch = []
+        i = 0
+        while True:
+            try:
+                time_series = self.next_unit()
+                time_series_batch.append(time_series)
+            except StopIteration:
+                break
+            if i == self._batch_size - 1:
+                break
+            i += 1
+        if len(time_series_batch) == 0:
+            raise StopIteration
+        return time_series_batch
+
+    def next(self):
+        if self._batch:
+            return self.next_batch()
+        else:
+            return self.next_unit()
+
+    def rewind(self):
+        for cursor in self._cursors:
+            cursor.rewind()
+        self._current_cursor_index = 0
+
+    @property
+    def _current_cursor(self):
+        return self._cursors[self._current_cursor_index]
+
+
+class MachoTimeSeriesIterable(TimeSeriesIterable):
+
+    def __init__(self, batch, database, n_fields=82):
+        self._batch = batch
+        self._database = database
+        self._n_fields = n_fields
+        self._current_field = 0
+        self._current_tile_index = 0
+        self._current_field_tiles = self._database.get_tiles_in_field(0)
+
+
+    def __len__(self):
+        pass
+
+    def __iter__(self):
+        return self
+
+    def next_unit(self):
+        return None
+
+    def next_batch(self):
+        if self._current_tile_index >= len(self._current_field_tiles):
+            self._current_tile_index = 0
+            self._current_field += 1
+            self._current_field_tiles = self._database.get_tiles_in_field(self._current_field)
+        if self._current_field > self._n_fields:
+            raise StopIteration
+        batch = self._database.get_many(self._current_field, self._current_field_tiles[self._current_tile_index])
+        self._current_tile_index += 1
+        return batch
+
+    def next(self):
+        if self._batch:
+            return self.next_batch()
+        else:
+            return self.next_unit()
+
+    def rewind(self):
+        self._current_field = 0
+        self._current_tile_index = 0
+        self._current_field_tiles = self._database.get_tiles_in_field(0)
 
 
 

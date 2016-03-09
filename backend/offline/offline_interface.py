@@ -4,7 +4,7 @@ import json, os, glob
 import pandas as pd
 import numpy as np
 from offline_algorithms import Birch, IncrementalPCA as IPCA
-from ..data_model.time_series import TimeSeriesMongoDataBase, MachoFileDataBase
+from ..data_model.time_series import MongoTimeSeriesDataBase, MachoFileDataBase
 from ..data_model.clusters import ClustersMongoDataBase, Cluster
 from ..data_model.serializing import SerializingMongoDatabase
 
@@ -14,9 +14,8 @@ class OfflineInterface(object):
 
     __instance = None
 
-
     def __new__(cls):
-        if cls.__instance == None:
+        if cls.__instance is None:
             cls.__instance = object.__new__(cls)
         return cls.__instance
 
@@ -39,9 +38,9 @@ class OfflineInterface(object):
         clustering_db.setup()
         serializing_db.setup()
 
-    #TODO
-    def defragment(self):
-        pass
+    def defragment_clusters(self, clustering_db_index=0):
+        clustering_db = self.get_clustering_database(clustering_db_index)
+        clustering_db.defragment()
 
     def get_reduction_model(self, serializing_db_index=0, model_index=0):
         serializing_db = self.get_serializing_database(serializing_db_index)
@@ -72,7 +71,7 @@ class OfflineInterface(object):
         model_type = db_info['type']
         parameters = db_info['parameters']
         if model_type == 'mongodb':
-            Database = TimeSeriesMongoDataBase
+            Database = MongoTimeSeriesDataBase
         elif model_type == 'macho':
             Database = MachoFileDataBase
         return Database(**parameters)
@@ -93,7 +92,14 @@ class OfflineInterface(object):
             Database = SerializingMongoDatabase
         return Database(**parameters)
 
-    def calculate_features_all(self, serializing_db_index=0, reduction_model_index=0, time_series_db_index=0):
+    def transfer_time_series(self, source_database_index, destination_database_index=0):
+        source_db = self.get_time_series_database(source_database_index)
+        destination_db = self.get_time_series_database(destination_database_index)
+        batch_iterable = source_db.get_all(1)#TODO ELIMINATE THAT '1'
+        for batch in batch_iterable:
+            destination_db.add_many(batch)
+
+    def calculate_all_features(self, database_index):
         pass
 
     def reduce_all(self, serializing_db_index=0, reduction_model_index=0, time_series_db_index=0):
@@ -111,6 +117,5 @@ class OfflineInterface(object):
 
 
 
-    def copy_database_data(self, source_database_index, destination_database_index):
-        pass
+
 

@@ -85,7 +85,7 @@ df = pd.DataFrame(X, index=[hex(i) for i in range(len(X))])
 
 threshold = 3
 outlier_rate = 1
-brc = Birch(threshold, 'd1', 'r', 5, True, outlier_rate, 50)
+brc = Birch(threshold, 'd1', 'r', 5, False, outlier_rate, 50)
 add_data_frame(brc, df.iloc[0:n*5])
 test(brc, df)
 

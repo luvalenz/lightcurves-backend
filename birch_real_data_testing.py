@@ -1,7 +1,7 @@
 __author__ = 'lucas'
 
 from backend.data_model.time_series import DataMultibandTimeSeries
-from backend.data_model.time_series import TimeSeriesMongoDataBase
+from backend.data_model.time_series import MongoTimeSeriesDataBase
 from backend.data_model.clusters import Cluster
 from backend.offline.offline_algorithms import Birch
 import numpy as np
@@ -17,9 +17,9 @@ def extract_feature_matrix(database, id_list):
         feature_vector = time_series.reduced_vector
         if len(feature_vector) != 0:
             feature_vectors.append(feature_vector)
-        else:
-            print(time_series.id)
-    print('{0}, {1}'.format(len(id_list), len(feature_vectors)))
+    #    else:
+    #        print(time_series.id)
+    #print('{0}, {1}'.format(len(id_list), len(feature_vectors)))
     return np.array((feature_vectors))
 
 
@@ -42,7 +42,7 @@ def plot_lightcurves(lightcurve_list):
     plt.plot(reduced_features[:, 0], reduced_features[:, 1], '*')
     plt.show()
 
-mongodb = TimeSeriesMongoDataBase('lightcurves')
+mongodb = MongoTimeSeriesDataBase('lightcurves')
 lightcurves = mongodb.find_many('macho', {})
 
 plot_lightcurves(lightcurves)
@@ -53,11 +53,11 @@ birch.add_many_time_series(lightcurves)
 
 
 local_centers, local_clusters = birch.get_cluster_list(mode='local')
-print(len(local_centers))
-print(len(local_clusters))
-for cluster in local_clusters:
-    print str(len(cluster)) + ' ',
-print ' '
+#print(len(local_centers))
+#print(len(local_clusters))
+#for cluster in local_clusters:
+#    print str(len(cluster)) + ' ',
+#print ' '
 plot_cluster_list(local_centers, local_clusters, mongodb)
 
 global_centers, global_clusters = birch.get_cluster_list(mode='global')
@@ -68,4 +68,4 @@ clusters = []
 for i, center, cluster in zip(range(len(global_centers)),
                                      global_centers, global_clusters):
     time_series_list = mongodb.get_many('macho', cluster)
-    clusters.append(Cluster.from_time_series_sequence(str(i), time_series_list, center))
+    clusters.append(Cluster.from_time_series_sequence(time_series_list, center))

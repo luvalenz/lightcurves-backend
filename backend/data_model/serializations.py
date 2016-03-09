@@ -5,7 +5,7 @@ from pymongo import MongoClient
 import pickle
 from bson.binary import Binary
 
-class SerializingDatabase(object):
+class SerializationDatabase(object):
 
     __metaclass_ = ABCMeta
 
@@ -42,11 +42,11 @@ class SerializingDatabase(object):
         pass
 
 
-class SerializingMongoDatabase(object):
+class SerializationMongoDatabase(object):
 
     __metaclass_ = ABCMeta
 
-    def __init__(self, db_name='lightcurves', url='localhost', port=27017):
+    def __init__(self, db_name='serializations', url='localhost', port=27017):
         client = MongoClient(url, port)
         self.db = client[db_name]
 

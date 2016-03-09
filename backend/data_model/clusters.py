@@ -59,8 +59,12 @@ class ClustersDataBase:
     def get_cluster(self, cluster_id):
         pass
 
+    @abstractmethod
+    def defragment(self):
+        pass
+
+
 class ClustersMongoDataBase(ClustersDataBase):
-    __metaclass__ = ABCMeta
 
     @property
     def cluster_ids(self):
@@ -161,6 +165,14 @@ class ClustersMongoDataBase(ClustersDataBase):
 
     def _get_cluster_data_points_cursor(self, cluster_id):
         return self.db[str(cluster_id)].find().sort('id', pymongo.ASCENDING)
+
+    def defragment(self):
+        collection_names = self.db.collection_names()
+        collection_names.remove('system.indexes')
+        results = {}
+        for collection_name in collection_names:
+            results[collection_name] = self.db.command('compact', collection_name)
+        return results
 
 
 class Cluster:

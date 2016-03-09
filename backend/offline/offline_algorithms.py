@@ -49,7 +49,7 @@ class IncrementalClustering:
 class Birch(IncrementalClustering):
 
     def __init__(self, threshold, cluster_distance_measure='d0', cluster_size_measure='r',
-                 n_global_clusters=50, remove_outliers=False, outlier_rate=1, branching_factor=50):
+                 n_global_clusters=50, remove_outliers=False, branching_factor=50):
         self.branching_factor = branching_factor
         self.threshold = threshold
         self.cluster_size_measure = cluster_size_measure
@@ -60,7 +60,6 @@ class Birch(IncrementalClustering):
         self._globally_labeled_data = None
         self.n_global_clusters = n_global_clusters
         self._remove_outliers = remove_outliers
-        self._outlier_rate = outlier_rate
 
     @property
     def count(self):
@@ -234,9 +233,21 @@ class Birch(IncrementalClustering):
         linear_sums = np.array(linear_sums)
         squared_norms = np.array(squared_norms)
         if self._remove_outliers:
-            count_median = np.mean(counts)
-            count_rate = counts / count_median
-            not_outliers = np.where(count_rate > self._outlier_rate)[0]
+            #print counts
+            count_mean = np.mean(counts)
+            #print count_mean
+            #count_std = np.std(counts)
+            count_mad = scale.mad(counts)
+            #print count_std
+            #print count_mad
+            #not_outliers = np.where(counts > count_mean - 4*count_mad)[0]
+            not_outliers = np.where(counts > 1)[0]
+            # order = np.argsort(counts)
+            # sorted_counts = counts[order]
+            # print sorted_counts
+            # gradient = np.diff(sorted_counts)
+            # print gradient
+            #not_outliers = order[np.min(np.argsort(gradient)[-3:]):]
             counts = counts[not_outliers]
             linear_sums = linear_sums[not_outliers]
             squared_norms = squared_norms[not_outliers]

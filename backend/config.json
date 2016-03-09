@@ -3,37 +3,38 @@
           [
             {
               "type": "birch",
-              "parameters": [1, 2, 3]
+              "parameters": [2, "d0", "r", 10, true, 50]
             }
           ],
   "reduction_algorithms":
           [
             {
               "type": "ipca",
-              "parameters" : [1, 2, 3]
+              "parameters" : [5]
             }
           ],
   "time_series_databases":
           [
             {
               "type": "mongodb",
-              "parameters": [1, 2, 3]
+              "parameters": [30000, "lightcurves", "localhost", 27017]
             },
             { "type": "macho",
-              "parameters": []}
+              "parameters": ["/media/lucas/115d830f-0d51-49ad-8a2f-84544fbab639/MACHO_LMC",
+                "/media/lucas/115d830f-0d51-49ad-8a2f-84544fbab639/MACHO_features_Harmonics"]}
           ],
   "clustering_databases":
           [
             {
               "type": "mongodb",
-              "parameters": [1, 2, 3]
+              "parameters": ["clusters", "localhost", 27017]
             }
           ],
   "serializing_databases":
           [
             {
               "type": "mongodb",
-              "parameters":[1,2,3]
+              "parameters": ["serializations", "localhost", 27017]
             }
           ]
  }
