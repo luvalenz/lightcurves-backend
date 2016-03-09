@@ -205,7 +205,7 @@ class Cluster:
     def center(self):
         return self._center
 
-    def __init__(self, data_ids, data_points, center, distances=None, id_=None):
+    def __init__(self, data_ids, data_points, center, id_=None, distances=None):
         if distances is None:
             distances = cdist(np.matrix(center), np.matrix(data_points))[0]
         order = np.argsort(distances)
@@ -266,5 +266,54 @@ class Cluster:
         return {'id': self.id, 'radius': self.radius, 'count': self.count, 'center': list(self.center)}
 
 
+class ClustersIterator(object):
 
+    def __init__(self, time_series_db, clusters, centers, batch=False, batch_size=10):
+        self._batch = batch
+        self._batch_size = batch_size
+        self._clusters = clusters
+        self._centers = centers
+        self._time_series_db = time_series_db
+        self._current_cluster_index = 0
+
+    def __len__(self):
+        return len(self._centers)
+
+    def __iter__(self):
+        return self
+
+    def next_unit(self):
+        if self._current_cluster_index >= len(self):
+            raise StopIteration
+            data_ids = self._clusters[self._current_cluster_index]
+            center = self._centers[self._current_cluster_index]
+            time_series_batch_iterator = self._time_series_db.get_many(data_ids, True)
+            cluster_obj = Cluster(data_ids, data_points, center, self._current_cluster_index)
+            self._current_cluster_index += 1
+            return cluster_obj
+
+    def next_batch(self):
+        clusters_batch = []
+        i = 0
+        while True:
+            try:
+                cluster = self.next_unit()
+                clusters_batch.append(cluster)
+            except StopIteration:
+                break
+            if i == self._batch_size - 1:
+                break
+            i += 1
+        if len(clusters_batch) == 0:
+            raise StopIteration
+        return clusters_batch
+
+    def next(self):
+        if self._batch:
+            return self.next_batch()
+        else:
+            return self.next_unit()
+
+    def rewind(self):
+        self._current_cluster_index = 0
 

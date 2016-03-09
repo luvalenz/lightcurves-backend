@@ -161,7 +161,7 @@ class MachoFileDataBase(TimeSeriesDataBase):
         return list_of_dicts
 
     def get_all(self, n_fields=82):
-        return MachoTimeSeriesIterable(True, self, n_fields)
+        return MachoTimeSeriesIterator(True, self, n_fields)
 
 
     def get_many(self, field, tile, original=True, phase=False, features=True, metadata=True):
@@ -286,7 +286,7 @@ class MongoTimeSeriesDataBase(TimeSeriesDataBase):
             collection = self.db[catalog]
             cursor = collection.find(query_dict)
             cursors.append(cursor)
-        return MongoTimeSeriesIterable(cursors, batch, self._batch_size)
+        return MongoTimeSeriesIterator(cursors, batch, self._batch_size)
 
     def get_many(self, id_list, catalog_name=None, batch=True):
         query = {'id': {'$in': id_list}}
@@ -768,7 +768,7 @@ class TimeSeriesBand(object):
         return np.column_stack((self.times, self.values, self.errors))
 
 
-class TimeSeriesIterable(object):
+class TimeSeriesIterator(object):
 
     __metaclass__ = ABCMeta
 
@@ -793,7 +793,7 @@ class TimeSeriesIterable(object):
         pass
 
 
-class MongoTimeSeriesIterable(TimeSeriesIterable):
+class MongoTimeSeriesIterator(TimeSeriesIterator):
 
     def __init__(self, cursors, batch=True, batch_size=3*10**5):
         self._batch = batch
@@ -852,7 +852,7 @@ class MongoTimeSeriesIterable(TimeSeriesIterable):
         return self._cursors[self._current_cursor_index]
 
 
-class MachoTimeSeriesIterable(TimeSeriesIterable):
+class MachoTimeSeriesIterator(TimeSeriesIterator):
 
     def __init__(self, batch, database, n_fields=82):
         self._batch = batch

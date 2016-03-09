@@ -89,7 +89,7 @@ class OfflineInterface(object):
         model_type = db_info['type']
         parameters = db_info['parameters']
         if model_type == 'mongodb':
-            Database = SerializingMongoDatabase
+            Database = SerializationMongoDatabase
         return Database(**parameters)
 
     def transfer_time_series(self, source_database_index, destination_database_index=0):

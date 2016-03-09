@@ -9,6 +9,7 @@ import os
 import pickle
 import operator
 import statsmodels.robust.scale as scale
+from ..data_model.clusters import ClustersIterator
 
 #python 2
 
@@ -30,6 +31,10 @@ class IncrementalClustering:
     @abstractmethod
     #kwargs options
     def get_cluster_list(self, database, **kwargs):
+        pass
+
+    @abstractmethod
+    def get_cluster_iterator(self):
         pass
 
     @abstractmethod
@@ -98,6 +103,11 @@ class Birch(IncrementalClustering):
             lc_indices = data[np.where(labels == label)[0]].tolist()
             cluster_list.append(lc_indices)
         return centers, cluster_list
+
+    def get_cluster_iterator(self, time_series_database, **kwargs):
+        centers, cluster_list = self.get_cluster_list(**kwargs)
+        return ClustersIterator(time_series_database, cluster_list, centers)
+
 
     def is_fitted(self, **kwargs):
         global_clusters = self._global_clustering
