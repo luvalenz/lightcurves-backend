@@ -43,7 +43,7 @@ def plot_lightcurves(lightcurve_list):
     plt.show()
 
 mongodb = MongoTimeSeriesDataBase('lightcurves')
-lightcurves_iterator = mongodb.find_many('macho', False, {})
+lightcurves_iterator = mongodb.find_many('macho', {}, False)
 
 lightcurves = []
 
@@ -58,7 +58,25 @@ birch = Birch(threshold, remove_outliers, True, 10)
 birch.add_many_time_series(lightcurves)
 
 
-local_centers, local_clusters = birch.get_cluster_list(mode='local')
+# local_centers, local_clusters = birch.get_cluster_list(mode='local')
+# sizes = []
+# for local_cluster in local_clusters:
+#     sizes.append(len(local_cluster))
+# print sizes
+# # sorted_sizes = sorted(sizes)
+# # sorted_sizes.reverse()
+# # cum_sum = np.cumsum(sorted_sizes)
+# # print(cum_sum)
+# h= plt.hist(sizes, bins=101, cumulative=True)
+# plt.show()
+# print h
+# # plt.plot(cum_sum)
+# # sorted_sizes.reverse()
+# # plt.xticks(sorted_sizes)
+# # plt.show()
+
+
+
 #print(len(local_centers))
 #print(len(local_clusters))
 #for cluster in local_clusters:

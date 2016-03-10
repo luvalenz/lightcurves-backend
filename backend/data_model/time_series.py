@@ -59,7 +59,7 @@ class TimeSeriesDataBase(object):
         pass
 
     @abstractmethod
-    def add_many(self, data):
+    def add_many(self, catalog, data):
         pass
 
     @abstractmethod
@@ -234,7 +234,6 @@ class MongoTimeSeriesDataBase(TimeSeriesDataBase):
     def __init__(self, batch_size=3*10**5, db_name='lightcurves', url='localhost', port=27017):
         client = MongoClient(url, port)
         self.db = client[db_name]
-        self.collection_names = ['macho']
         self._batch_size = batch_size
         self._current_catalog = None
         self._current_cursor = None
@@ -246,6 +245,7 @@ class MongoTimeSeriesDataBase(TimeSeriesDataBase):
             collection_names.remove('system.indexes')
         return collection_names
 
+    #must be called after adding elements to the db
     def setup(self):
         collection_names = self.collection_names
         existing_collection_names = self.catalog_names
@@ -273,10 +273,12 @@ class MongoTimeSeriesDataBase(TimeSeriesDataBase):
         else:
             return None
 
-    def get_all(self):
-        self.find_many(None, True, {})
+    def get_all(self, batch_size=None):
+        return self.find_many(None, {}, True, batch_size)
 
-    def find_many(self, catalog_name, batch, query_dict):
+    def find_many(self, catalog_name, query_dict, batch=True, batch_size=None):
+        if batch_size is None:
+            batch_size = self._batch_size
         if catalog_name is None:
             catalogs = self.catalog_names
         else:
@@ -286,11 +288,11 @@ class MongoTimeSeriesDataBase(TimeSeriesDataBase):
             collection = self.db[catalog]
             cursor = collection.find(query_dict)
             cursors.append(cursor)
-        return MongoTimeSeriesIterator(cursors, batch, self._batch_size)
+        return MongoTimeSeriesIterator(cursors, batch, batch_size)
 
-    def get_many(self, id_list, catalog_name=None, batch=True):
+    def get_many(self, id_list, catalog_name=None, batch=True, batch_size=None):
         query = {'id': {'$in': id_list}}
-        return self.find_many(catalog_name, batch, query)
+        return self.find_many(catalog_name, query, batch, batch_size)
 
     def metadata_search(self, catalog_name, **kwargs):
         query = []
@@ -858,9 +860,7 @@ class MachoTimeSeriesIterator(TimeSeriesIterator):
         self._batch = batch
         self._database = database
         self._n_fields = n_fields
-        self._current_field = 0
-        self._current_tile_index = 0
-        self._current_field_tiles = self._database.get_tiles_in_field(0)
+        self.rewind()
 
 
     def __len__(self):
@@ -875,8 +875,8 @@ class MachoTimeSeriesIterator(TimeSeriesIterator):
     def next_batch(self):
         if self._current_tile_index >= len(self._current_field_tiles):
             self._current_tile_index = 0
-            self._current_field += 1
             self._current_field_tiles = self._database.get_tiles_in_field(self._current_field)
+            self._current_field += 1
         if self._current_field > self._n_fields:
             raise StopIteration
         batch = self._database.get_many(self._current_field, self._current_field_tiles[self._current_tile_index])
@@ -890,9 +890,9 @@ class MachoTimeSeriesIterator(TimeSeriesIterator):
             return self.next_unit()
 
     def rewind(self):
-        self._current_field = 0
+        self._current_field = 1
         self._current_tile_index = 0
-        self._current_field_tiles = self._database.get_tiles_in_field(0)
+        self._current_field_tiles = self._database.get_tiles_in_field(self._current_field)
 
 
 

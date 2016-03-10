@@ -60,11 +60,13 @@ class SerializationMongoDatabase(object):
 
     @property
     def reduction_model(self):
-        return self.db['models'].find_one({'model': 'reduction'})
+        binary = self.db['models'].find_one({'model': 'reduction'})['bin-data']
+        return pickle.loads(binary)
 
     @property
     def clustering_model(self):
-        return self.db['models'].find_one({'model': 'clustering'})
+        binary = self.db['models'].find_one({'model': 'clustering'})['bin-data']
+        return pickle.loads(binary)
 
     def setup(self):
         collection = self.db['models']

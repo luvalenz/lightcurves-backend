@@ -264,7 +264,7 @@ class Birch(IncrementalClustering):
             #print count_std
             #print count_mad
             #not_outliers = np.where(counts > count_mean - 4*count_mad)[0]
-            not_outliers = np.where(counts > 1)[0]
+            not_outliers = np.where(counts > 0)[0]
             # order = np.argsort(counts)
             # sorted_counts = counts[order]
             # print sorted_counts
@@ -878,45 +878,47 @@ class IncrementalPCA(IncrementalDimensionalityReduction):
             n = self.n + len(x)
 
     def _extract_feature_matrix(self, time_series_list, only_absents):
-        ids = []
-        feature_vectors = []
+        added_ids = []
+        added_feature_vectors = []
+        added_time_series = []
+        feature_matrix = None
         for time_series in time_series_list:
             id_ = time_series.id
-            feature_vector = time_series.reduced_vector
+            feature_vector = time_series.feature_vector
             if only_absents and id_ in self.data_ids:
                 continue
             if len(feature_vector) != 0:
-                ids.append(id_)
-                feature_vectors.append(feature_vector)
-        return np.matrix(np.vstack(feature_vectors)), ids
+                added_time_series.append(time_series)
+                added_ids.append(id_)
+                added_feature_vectors.append(feature_vector)
+        if len(added_feature_vectors) != 0:
+            feature_matrix = np.matrix(np.vstack(added_feature_vectors))
+        return added_time_series, added_ids, feature_matrix
 
     @staticmethod
     def _update_time_series(time_series_list, reduced_matrix):
+        if len(time_series_list) != len(reduced_matrix):
+            raise ValueError("Lengths of time series list and reduced_matrix must match.")
         for reduced_vector, time_series in zip(reduced_matrix, time_series_list):
             time_series.set_reduced(np.array(reduced_vector).flatten())
 
     def add_many_time_series(self, time_series_list):
-        feature_matrix, ids = self._extract_feature_matrix(time_series_list, True)
-        self._add_data_matrix(feature_matrix, ids)
+        added_time_series, ids, feature_matrix = self._extract_feature_matrix(time_series_list, True)
+        if feature_matrix is not None:
+            self._add_data_matrix(feature_matrix, ids)
         return feature_matrix
 
-    def transform_time_series(self, time_series_list):
-        feature_matrix, ids = self._extract_feature_matrix(time_series_list, False)
-        reduced_matrix = self._transform_data_matrix(feature_matrix)
-        IncrementalPCA._update_time_series(time_series_list, reduced_matrix)
-        return reduced_matrix
+    def transform_time_series(self, time_series_list):    
+        added_time_series, ids, feature_matrix = self._extract_feature_matrix(time_series_list, False)
+        if feature_matrix is not None:
+            reduced_matrix = self._transform_data_matrix(feature_matrix)
+            IncrementalPCA._update_time_series(added_time_series, reduced_matrix)
+        return len(ids)
 
     def add_transform_time_series(self, time_series_list):
-        feature_matrix, ids = self._extract_feature_matrix(time_series_list, True)
-        self._add_data_matrix(feature_matrix, ids)
-        reduced_matrix = self._transform_data_matrix(feature_matrix)
-        IncrementalPCA._update_time_series(time_series_list, reduced_matrix)
-        return feature_matrix, reduced_matrix
-
-
-
-
-
-
-
-
+        added_time_series, ids, feature_matrix = self._extract_feature_matrix(time_series_list, True)
+        if feature_matrix is not None:
+            self._add_data_matrix(feature_matrix, ids)
+            reduced_matrix = self._transform_data_matrix(feature_matrix)
+            IncrementalPCA._update_time_series(added_time_series, reduced_matrix)
+        return len(ids)
