@@ -3,11 +3,11 @@ __author__ = 'lucas'
 import json, os, glob
 import pandas as pd
 import numpy as np
+import itertools
 from offline_algorithms import Birch, IncrementalPCA as IPCA
 from ..data_model.time_series import MongoTimeSeriesDataBase, MachoFileDataBase
 from ..data_model.clusters import ClustersMongoDataBase, Cluster
 from ..data_model.serializations import SerializationMongoDatabase
-
 
 
 class OfflineInterface(object):
@@ -130,12 +130,14 @@ class OfflineInterface(object):
             clustering_model.add_many_time_series(time_series_list)
         serialization_db.store_clustering_model(clustering_model)
 
-    def store_all_clusters(self, serialization_db_index=0, clustering_model_index=0, clustering_db_index=0):
+    def store_all_clusters(self, time_series_db_index=0, clustering_db_index=0, serialization_db_index=0, clustering_model_index=0, ):
         clustering_model = self.get_clustering_model(serialization_db_index, clustering_model_index)
         clustering_db = self.get_clustering_database(clustering_db_index)
+        time_series_db = self.get_time_series_database(time_series_db_index)
         clustering_db.reset_database()
-
-
+        clusters_iterator = clustering_model.get_cluster_iterator(time_series_db)
+        for i, cluster in itertools.izip(xrange(len(clusters_iterator)), clusters_iterator):
+            clustering_db.store_cluster(i, clustering_db)
 
 
 
