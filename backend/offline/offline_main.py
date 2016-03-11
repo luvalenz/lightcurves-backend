@@ -47,4 +47,5 @@ if __name__ == "__main__":
     # plot_cluster_list(local_centers, local_clusters, mongodb)
     # global_centers, global_clusters = clustering_model.get_cluster_list(mode='global')
     # plot_cluster_list(global_centers, global_clusters, mongodb)
-    interface.store_all_clusters()
+    # interface.store_all_clusters()
+    interface.defragment_clusters()

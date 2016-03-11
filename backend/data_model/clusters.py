@@ -172,7 +172,8 @@ class ClustersMongoDataBase(ClustersDataBase):
 
     def defragment(self):
         collection_names = self.db.collection_names()
-        collection_names.remove('system.indexes')
+        if 'system.indexes' in collection_names:
+            collection_names.remove('system.indexes')
         results = {}
         for collection_name in collection_names:
             results[collection_name] = self.db.command('compact', collection_name)
@@ -205,7 +206,7 @@ class Cluster:
     def center(self):
         return self._center
 
-    def __init__(self, data_ids, data_points, center, id_=None, distances=None):
+    def __init__(self, data_ids, data_points, center, id_= None, distances=None):
         if distances is None:
             distances = cdist(np.matrix(center), np.matrix(data_points))[0]
         order = np.argsort(distances)
@@ -286,7 +287,6 @@ class ClustersIterator(object):
             raise StopIteration
         data_ids = self._clusters[self._current_cluster_index]
         center = self._centers[self._current_cluster_index]
-        cluster_time_series = []
         time_series_iterator = self._time_series_db.get_many(data_ids, None, False)
         cluster_obj = Cluster.from_time_series_sequence(time_series_iterator, center, self._current_cluster_index)
         self._current_cluster_index += 1
@@ -317,3 +317,76 @@ class ClustersIterator(object):
     def rewind(self):
         self._current_cluster_index = 0
 
+
+class DatabaseClustersIterator(object):
+
+    __metaclass__ = ABCMeta
+
+    @abstractmethod
+    def __init__(self, batch= True, batch_size=3*10**5):
+        pass
+
+    @abstractmethod
+    def __len__(self):
+        pass
+
+    @abstractmethod
+    def __iter__(self):
+        pass
+
+    @abstractmethod
+    def next(self):
+        pass
+
+    @abstractmethod
+    def rewind(self):
+        pass
+
+
+class MongoClustersIterator(DatabaseClustersIterator):
+
+    def __init__(self, database, batch=True, batch_size=3*10**5):
+        self._batch = batch
+        self._database = database
+        self._batch_size = batch_size
+        self._current_cluster_index = 0
+        self._clusters_ids = database.clusters_ids
+
+    def __len__(self):
+        return len(self._clusters_ids)
+
+    def __iter__(self):
+        return self
+
+    def next_unit(self):
+        if self._current_cluster_index >= len(self):
+            raise StopIteration
+        current_cluster_id = self._clusters_ids[self._current_cluster_index]
+        current_cluster = self._database.get_cluster(current_cluster_id)
+        self._current_cluster_index += 1
+        return current_cluster
+
+    def next_batch(self):
+        clusters_batch = []
+        i = 0
+        while True:
+            try:
+                clusters = self.next_unit()
+                clusters_batch.append(clusters)
+            except StopIteration:
+                break
+            if i == self._batch_size - 1:
+                break
+            i += 1
+        if len(clusters_batch) == 0:
+            raise StopIteration
+        return clusters_batch
+
+    def next(self):
+        if self._batch:
+            return self.next_batch()
+        else:
+            return self.next_unit()
+
+    def rewind(self):
+        self._current_cluster_index = 0
