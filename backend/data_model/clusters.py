@@ -139,7 +139,7 @@ class ClustersMongoDataBase(ClustersDataBase):
 
     def _get_cluster_info(self, cluster_id):
         info_collection = self.db['info']
-        return info_collection.find_one({'id': str(cluster_id)})
+        return info_collection.find_one({'id': int(cluster_id)})
 
     def get_radius(self, cluster_id):
         return self._get_cluster_info(cluster_id)['radius']
@@ -151,8 +151,8 @@ class ClustersMongoDataBase(ClustersDataBase):
         return self._get_cluster_info(cluster_id)['count']
 
     def get_cluster_data(self, cluster_id):
-        data_points = list(self._get_cluster_data_points_cursor(cluster_id))
-        cluster = Cluster.from_list_of_dicts(data_points)
+        data_point_list_of_dicts = list(self._get_cluster_data_points_cursor(cluster_id))
+        cluster = Cluster.from_list_of_dicts(data_point_list_of_dicts, None, cluster_id, False)
         return cluster.data_points
 
     def get_data_ids(self, cluster_id):
@@ -165,8 +165,7 @@ class ClustersMongoDataBase(ClustersDataBase):
     def get_cluster(self, cluster_id):
         center = self.db['info'].find_one({'id': cluster_id})['center']
         data_points = list(self._get_cluster_data_points_cursor(cluster_id))
-        return Cluster.from_list_of_dicts(data_points, cluster_id, center)
-
+        return Cluster.from_list_of_dicts(data_points, center, cluster_id, False)
     def _get_cluster_data_points_cursor(self, cluster_id):
         return self.db[str(cluster_id)].find().sort('id', pymongo.ASCENDING)
 
@@ -205,16 +204,19 @@ class Cluster:
     def center(self):
         return self._center
 
-    def __init__(self, data_ids, data_points, center, id_=None, distances=None):
-        if distances is None:
-            distances = cdist(np.matrix(center), np.matrix(data_points))[0]
-        order = np.argsort(distances)
+    def __init__(self, data_ids, data_points, center, id_=None, distances=None, sort=True):
+        if sort:
+            if distances is None:
+                distances = cdist(np.matrix(center), np.matrix(data_points))[0]
+            order = np.argsort(distances)
+            data_points = np.array(data_points)[order]
+            distances = np.array(distances[order])
+            data_ids = list(np.array(data_ids)[order])
         self._center = center
-        self._data_points = np.array(data_points[order])
-        self._distances = np.array(distances[order])
-        data_ids = np.array(data_ids)
-        self._data_point_ids = list(data_ids[order])
         self._id = id_
+        self._data_point_ids = data_ids
+        self._data_points = np.array(data_points)
+        self._distances = np.array(distances)
 
     @staticmethod
     def from_pandas_data_frame(dataframe, center):
@@ -226,15 +228,15 @@ class Cluster:
         return Cluster(data_indices, data_points, center, distances)
 
     @staticmethod
-    def from_list_of_dicts(data_point_list, id_=None, center=None):
+    def from_list_of_dicts(data_point_list, center=None, id_=None, sort=False):
         data_ids= []
         values = []
         distances = []
         for data_point_dictionary in data_point_list:
             data_ids.append(data_point_dictionary['id'])
             values.append(data_point_dictionary['values'])
-            distances.append(data_point_dictionary['distances'])
-        return Cluster(data_ids, values, center, id_)
+            distances.append(data_point_dictionary['distance'])
+        return Cluster(data_ids, values, center, id_, distances, sort)
 
     @staticmethod
     def from_time_series_sequence(time_series_sequence, center, id_):

@@ -78,8 +78,11 @@ class Birch(IncrementalClustering):
     def add_many_time_series(self, time_series_list):
         self._locally_labeled_data = None
         self._globally_labeled_data = None
+        n_added = 0
         for time_series in time_series_list:
-            self._try_add_one_time_series(time_series)
+            if self._try_add_one_time_series(time_series):
+                n_added += 1
+        return n_added
 
     def get_cluster_list(self, **kwargs):
         global_clusters = self._global_clustering
@@ -328,7 +331,7 @@ class Birch(IncrementalClustering):
             distances[j_indices] = np.inf
             n_global_clusters -= 1
         indices_list = list(indices_dict.values())
-        print(indices_list)
+        #print(indices_list)
         self._build_global_clusters(indices_list)
 
     def _build_global_clusters(self, indices_list):
@@ -381,6 +384,8 @@ class Birch(IncrementalClustering):
         if id_ not in self._data_ids:
             if reduced_vector is not None and len(reduced_vector):
                 self._add_data_point(id_, np.array(reduced_vector))
+                return True
+        return False
 
     def _add_data_point(self, id_, data_point):
         self._globally_labeled_data = None

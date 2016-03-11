@@ -125,7 +125,7 @@ class MachoFileDataBase(TimeSeriesDataBase):
         features_dict = {}
         if features:
             features_dict = self.get_features(id_)
-        return {'bands': bands_dict, 'features': features_dict, 'metadata': metadata_dict, 'id': id_}
+        return {'bands': bands_dict, 'features': features_dict, 'metadata': metadata_dict, 'id': 'macho.{0}'.format(id_)}
 
     def get_one(self, id_, original=True, phase=False, features=True, metadata=True):
         return DataMultibandTimeSeries.from_dict(self.get_one_dict(id_, original, phase, features, metadata))
@@ -162,7 +162,6 @@ class MachoFileDataBase(TimeSeriesDataBase):
 
     def get_all(self, n_fields=82):
         return MachoTimeSeriesIterator(True, self, n_fields)
-
 
     def get_many(self, field, tile, original=True, phase=False, features=True, metadata=True):
         list_of_dicts = self.get_many_dict(field, tile, original, phase, features, metadata)
@@ -318,8 +317,14 @@ class MongoTimeSeriesDataBase(TimeSeriesDataBase):
 
     def add_many(self, catalog_name, data):
         collection = self.db[catalog_name]
-        data = [datum if isinstance(datum, dict) else datum.to_dict() for datum in data]
-        collection.insert_many(data)
+        ids = []
+        data_dicts = []
+        for datum in data:
+            datum_dict = datum if isinstance(datum, dict) else datum.to_dict()
+            data_dicts.append(datum_dict)
+            ids.append(datum_dict['id'])
+        collection.insert_many(data_dicts)
+        return ids
 
     def delete_one(self, catalog_name, id_):
         collection = self.db[catalog_name]

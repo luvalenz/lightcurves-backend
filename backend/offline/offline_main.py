@@ -28,23 +28,34 @@ def plot_cluster_list(centers, clusters, database):
 
 if __name__ == "__main__":
     interface = OfflineInterface()
-    #ts_db = interface.get_time_series_database()
-    #transfer data
-    #interface.transfer_time_series('macho', 1,0)
-    #calculate features
-    #interface.calculate_missing_features(0, 5)
-    #interface.recalculate_all_features(0, 5)
-    #setup
-    #interface._setup()
-    #reduce dimensionality
-    #interface.reduce_all(0, 0, 0)
-    #cluster
-    # interface.cluster_all(0, 0, 0)
-    # clustering_model = interface.get_clustering_model(0,0)
-    # print(clustering_model)
-    # mongodb = interface.get_time_series_database()
-    # local_centers, local_clusters = clustering_model.get_cluster_list(mode='local')
-    # plot_cluster_list(local_centers, local_clusters, mongodb)
-    # global_centers, global_clusters = clustering_model.get_cluster_list(mode='global')
-    # plot_cluster_list(global_centers, global_clusters, mongodb)
-    interface.store_all_clusters()
+    # #ts_db = interface.get_time_series_database()
+    # #transfer data
+    # ids = interface.transfer_time_series('macho', 1,0)
+    # print ids
+    # #calculate features
+    # #interface.calculate_missing_features(0, 5)
+    # #interface.recalculate_all_features(0, 5)
+    # #setup
+    # #interface._setup()
+    # #reduce dimensionality
+    # interface.reduce_some(ids, 'macho', 0, 0, 0)
+    # #cluster
+    # interface.cluster_some(ids, 'macho', 0, 0, 0)
+    # # clustering_model = interface.get_clustering_model(0,0)
+    # # print(clustering_model)
+    # # mongodb = interface.get_time_series_database()
+    # # local_centers, local_clusters = clustering_model.get_cluster_list(mode='local')
+    # # plot_cluster_list(local_centers, local_clusters, mongodb)
+    # # global_centers, global_clusters = clustering_model.get_cluster_list(mode='global')
+    # # plot_cluster_list(global_centers, global_clusters, mongodb)
+    # interface.store_all_clusters()
+    interface.get_clustering_model(0,0)
+    clustering_db = interface.get_clustering_database()
+    for i in range(10):
+        cluster_data = clustering_db.get_cluster_data(i)
+        cluster = clustering_db.get_cluster(i)
+        print cluster_data
+        print len(cluster_data)
+        print cluster.data_points == cluster_data
+        print ""
+
