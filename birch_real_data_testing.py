@@ -58,7 +58,7 @@ birch = Birch(threshold, remove_outliers, True, 10)
 birch.add_many_time_series(lightcurves)
 
 
-# local_centers, local_clusters = birch.get_cluster_list(mode='local')
+local_centers, local_clusters = birch.get_cluster_list(mode='local')
 # sizes = []
 # for local_cluster in local_clusters:
 #     sizes.append(len(local_cluster))

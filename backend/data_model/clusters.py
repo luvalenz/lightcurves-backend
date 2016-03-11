@@ -104,11 +104,11 @@ class ClustersMongoDataBase(ClustersDataBase):
         pass
 
     def reset_database(self):
-        self.client.drop_database()
+        self.client.drop_database(self.db_name)
         self.db = self.client[self.db_name]
         self._info_loaded = False
         info_collection = self.db['info']
-        info_collection.create_index([("id", pymongo.ASCENDING)])
+        info_collection.create_index([("id", pymongo.ASCENDING)], background=True, unique=True)
 
     def store_cluster(self, index, cluster):
         document_list = cluster.to_list_of_dicts()
@@ -237,7 +237,7 @@ class Cluster:
         return Cluster(data_ids, values, center, id_)
 
     @staticmethod
-    def from_time_series_sequence(time_series_sequence, center):
+    def from_time_series_sequence(time_series_sequence, center, id_):
         ids = []
         values = []
         for time_series in time_series_sequence:
@@ -246,14 +246,13 @@ class Cluster:
                 values.append(time_series.reduced_vector)
                 ids.append(time_series.id)
         values = np.vstack(values)
-        return Cluster(ids, values, center)
+        return Cluster(ids, values, center, id_)
 
     def to_list_of_dicts(self):
         list_of_dicts = []
         for id_, values, distance in itertools.izip(self._data_point_ids, self._data_points, self._distances):
             list_of_dicts.append({'id': id_, 'values': list(values), 'distance': distance})
         return list_of_dicts
-
 
     def get_data_points_collection(self):
         list_of_dicts = []
@@ -285,12 +284,13 @@ class ClustersIterator(object):
     def next_unit(self):
         if self._current_cluster_index >= len(self):
             raise StopIteration
-            data_ids = self._clusters[self._current_cluster_index]
-            center = self._centers[self._current_cluster_index]
-            time_series_batch_iterator = self._time_series_db.get_many(data_ids, True)
-            cluster_obj = Cluster(data_ids, data_points, center, self._current_cluster_index)
-            self._current_cluster_index += 1
-            return cluster_obj
+        data_ids = self._clusters[self._current_cluster_index]
+        center = self._centers[self._current_cluster_index]
+        cluster_time_series = []
+        time_series_iterator = self._time_series_db.get_many(data_ids, None, False)
+        cluster_obj = Cluster.from_time_series_sequence(time_series_iterator, center, self._current_cluster_index)
+        self._current_cluster_index += 1
+        return cluster_obj
 
     def next_batch(self):
         clusters_batch = []

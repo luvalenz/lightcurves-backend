@@ -247,9 +247,7 @@ class MongoTimeSeriesDataBase(TimeSeriesDataBase):
 
     #must be called after adding elements to the db
     def setup(self):
-        collection_names = self.collection_names
-        existing_collection_names = self.catalog_names
-        collection_names = list(set(existing_collection_names + collection_names))
+        collection_names = self.catalog_names
         for collection_name in collection_names:
             collection = self.db[collection_name]
             collection.create_index([("id", pymongo.ASCENDING)], background=True, unique=True)

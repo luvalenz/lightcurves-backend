@@ -27,8 +27,8 @@ class OfflineInterface(object):
     def __init__(self):
         pass
 
-    #bust be called after adding elements but before the reduction
-    def setup(self, time_series_db_index=0, clustering_db_index=0, serializing_db_index=0):
+    #bust be called after adding elements and before reduction
+    def _setup(self, time_series_db_index=0, clustering_db_index=0, serializing_db_index=0):
         time_series_db = self.get_time_series_database(time_series_db_index)
         clustering_db = self.get_clustering_database(clustering_db_index)
         serializing_db = self.get_serialization_database(serializing_db_index)
@@ -39,11 +39,12 @@ class OfflineInterface(object):
     def transfer_time_series(self, catalog_name, source_database_index, destination_database_index=0):
         source_db = self.get_time_series_database(source_database_index)
         destination_db = self.get_time_series_database(destination_database_index)
-        batch_iterable = source_db.get_all(1)#TODO ELIMINATE THAT '1'
+        batch_iterable = source_db.get_all()#TODO ELIMINATE THAT '1'
         for batch in batch_iterable:
             if len(batch) != 0:
                 print ('adding {0} elements to destination...'.format(len(batch)))
                 destination_db.add_many(catalog_name, batch)
+        self._setup()
 
     def defragment_clusters(self, clustering_db_index=0):
         clustering_db = self.get_clustering_database(clustering_db_index)
@@ -51,6 +52,7 @@ class OfflineInterface(object):
 
     def get_reduction_model(self, serializing_db_index=0, model_index=0):
         serializing_db = self.get_serialization_database(serializing_db_index)
+
         if serializing_db.has_reduction_model:
             return serializing_db.reduction_model
         else:
@@ -163,7 +165,7 @@ class OfflineInterface(object):
         clustering_db.reset_database()
         clusters_iterator = clustering_model.get_cluster_iterator(time_series_db)
         for i, cluster in itertools.izip(xrange(len(clusters_iterator)), clusters_iterator):
-            clustering_db.store_cluster(i, clustering_db)
+            clustering_db.store_cluster(i, cluster)
 
 
 

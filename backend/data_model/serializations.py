@@ -70,7 +70,7 @@ class SerializationMongoDatabase(object):
 
     def setup(self):
         collection = self.db['models']
-        collection.create_index([("id", pymongo.ASCENDING)], background=True, unique=True)
+        collection.create_index([("model", pymongo.ASCENDING)], background=True, unique=True)
 
     def store_reduction_model(self, model):
         binary_data = pickle.dumps(model)
@@ -79,5 +79,5 @@ class SerializationMongoDatabase(object):
 
     def store_clustering_model(self, model):
         binary_data = pickle.dumps(model)
-        document = {'model': 'reduction', 'bin-data': Binary(binary_data)}
+        document = {'model': 'clustering', 'bin-data': Binary(binary_data)}
         self.db['models'].replace_one({'model': 'clustering'}, document, True)
