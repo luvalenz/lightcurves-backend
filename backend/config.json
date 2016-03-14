@@ -3,7 +3,7 @@
           [
             {
               "type": "birch",
-              "parameters": [2, true, true, 10]
+              "parameters": [2, true, true, 5]
             }
           ],
   "reduction_algorithms":

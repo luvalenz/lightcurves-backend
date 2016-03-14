@@ -6,6 +6,7 @@ from backend.offline.offline_algorithms import Birch, IncrementalPCA as IPCA
 from backend.data_model.time_series import MongoTimeSeriesDataBase, MachoFileDataBase
 from backend.data_model.clusters import ClustersMongoDataBase, Cluster
 from backend.data_model.serializations import SerializationMongoDatabase
+import os
 
 
 class OfflineInterface(object):
@@ -19,10 +20,11 @@ class OfflineInterface(object):
         return cls.__instance
 
     def set_config(self):
-        #print(glob.glob('*'))
-        with open('../config.json') as data_file:
+        config_dir = os.path.dirname(os.path.dirname(__file__))
+        config_path = os.path.join(config_dir, 'config.json')
+        with open(config_path) as data_file:
             data = json.load(data_file)
-        self.config = data
+            self.config = data
 
     def __init__(self):
         pass
@@ -96,7 +98,7 @@ class OfflineInterface(object):
             Database = ClustersMongoDataBase
         return Database(*parameters)
 
-    def get_serialization_database(self, index):
+    def get_serialization_database(self, index=0):
         db_info = self.config['serializing_databases'][index]
         model_type = db_info['type']
         parameters = db_info['parameters']
@@ -199,7 +201,8 @@ class OfflineInterface(object):
         serialization_db.store_clustering_model(clustering_model)
         print("DONE")
 
-    def store_all_clusters(self, time_series_db_index=0, clustering_db_index=0, serialization_db_index=0, clustering_model_index=0, ):
+    def store_all_clusters(self, time_series_db_index=0, clustering_db_index=0,
+                           serialization_db_index=0, clustering_model_index=0):
         clustering_model = self.get_clustering_model(serialization_db_index, clustering_model_index)
         clustering_db = self.get_clustering_database(clustering_db_index)
         time_series_db = self.get_time_series_database(time_series_db_index)

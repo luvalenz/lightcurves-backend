@@ -541,7 +541,10 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
         self._id = id_
 
     def _set_bands(self, band_names, times, values, errors, phase):
-        n_bands_match = len(band_names) == len(times) == len(values)
+        if times == values == None and band_names == []:
+            n_bands_match = True
+        else:
+            n_bands_match = len(band_names) == len(times) == len(values)
         if errors is not None:
             n_bands_match = n_bands_match and len(band_names) == len(errors)
         if phase is not None:

@@ -260,14 +260,14 @@ class Birch(IncrementalClustering):
         squared_norms = np.array(squared_norms)
         if self._remove_outliers:
             #print counts
-            count_mean = np.mean(counts)
+           # count_mean = np.mean(counts)
             #print count_mean
             #count_std = np.std(counts)
-            count_mad = scale.mad(counts)
+            #count_mad = scale.mad(counts)
             #print count_std
             #print count_mad
             #not_outliers = np.where(counts > count_mean - 4*count_mad)[0]
-            not_outliers = np.where(counts > 0)[0]
+            not_outliers = np.where(counts > 1)[0]
             # order = np.argsort(counts)
             # sorted_counts = counts[order]
             # print sorted_counts
