@@ -222,7 +222,7 @@ class Cluster:
             data_ids = list(np.array(data_ids)[order])
         self._center = center
         self._id = id_
-        self._data_point_ids = data_ids
+        self._data_point_ids = np.array(data_ids)
         self._data_points = np.array(data_points)
         self._distances = np.array(distances)
 
@@ -270,6 +270,10 @@ class Cluster:
             element = {'id': self._id, 'values': data_point.to_list(), 'distance': distance}
             list_of_dicts.append(element)
         return list_of_dicts
+
+    def get_ring_of_data(self, width):
+        ring_indices = np.where(self._distances >= self.radius - width)[0]
+        return self.data_points[ring_indices], self.data_point_ids[ring_indices]
 
     def get_info(self):
         return {'id': self.id, 'radius': self.radius, 'count': self.count, 'center': list(self.center)}

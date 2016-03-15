@@ -56,40 +56,49 @@ def plot_clusters(clusters):
     for cluster, col in zip(clusters, colors):
         cluster_data = cluster.data_points
         plt.plot(cluster_data[:, 0], cluster_data[:, 1], 'o', markerfacecolor=col)
+   # plt.plot(target[0], target[1], 'x')
     plt.show()
 
-#
+offline_interface = OfflineInterface()
+
 # mean1 = [10, 10]
 # mean2 = [20, 20]
 # mean3 = [30, 30]
 # mean4 = [40, 40]
-# mean5 = [50, 50]
-# cov1 = [[2.5, 0], [0, 2.5]]
-# cov2 = [[1, 0], [0, 1]]
-# n = 50
+# cov1 = [[3, 0], [0, 3]]
+# cov2 = [[3, 0], [0, 3]]
+# n = 2
 # X1= np.random.multivariate_normal(mean1, cov1, n)
 # X2= np.random.multivariate_normal(mean2, cov1, n)
 # X3= np.random.multivariate_normal(mean3, cov1, n)
 # X4 = np.random.multivariate_normal(mean4, cov2, n)
-# X5 = np.random.multivariate_normal(mean5, cov2, n)
-# X = np.vstack((X1, X2, X3, X4, X5))
-# order = np.arange(len(X))
-# np.random.shuffle(order)
-# X = X[order]
-# #print X
-# # np.save('test_array', X)
+# X = np.vstack((X1, X2, X3, X4))
+# # order = np.arange(len(X))
+# # np.random.shuffle(order)
+# # X = X[order]
 # plt.plot(X[:, 0], X[:, 1], '*')
 # plt.show()
-# df = pd.DataFrame(X, index=[hex(i) for i in range(len(X))])
-offline_interface = OfflineInterface()
+# df = pd.DataFrame(X, index=[str(i) for i in range(len(X))])
 # time_series_db = offline_interface.get_time_series_database()
 # add_data_frame_to_database(time_series_db, df)
 # brc = offline_interface.get_clustering_model()
 # offline_interface.cluster_all()
 # serialization_db = offline_interface.get_serialization_database()
 # offline_interface.store_all_clusters()
+
 clusters_db = offline_interface.get_clustering_database()
 clusters = clusters_db.get_all()
+target = [23.6, 26.3]
 plot_clusters(clusters)
 our_method = OurMethod(clusters_db)
-our_method.query([10.0, 10.0], 2)
+ids, distances = our_method.query(target, 3)
+print ids
+
+time_series_db = offline_interface.get_time_series_database()
+for id, distance in zip(ids, distances):
+    ts = time_series_db.get_one('test', id)
+    print ts.reduced_vector
+    print ts.id
+    print distance
+    print np.linalg.norm(ts.reduced_vector - target)
+
