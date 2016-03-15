@@ -4,29 +4,20 @@ import numpy as np
 import pandas as pd
 import scipy.spatial.distance as dist
 import os
+from backend.data_model.clusters import Cluster
 
 
 class OurMethodCluster:
 
-    @property
-    def radius(self):
-        return self.sorted_distances[-1]
 
-    @property
-    def number_of_data(self):
-        return len(self.sorted_data)
-
-    def __init__(self, center, data_frame):
-        self.center = np.array(np.matrix(center))
-        self.sorted_distances = data_frame.loc[:,'distances'].values
-        self.sorted_data = data_frame.drop('distances', 1).values
-        self.sorted_data_ids = data_frame.index.values
+    def __init__(self, data_ids, data_points, center, id_=None, distances=None):
+        super(self, OurMethodCluster).__init__(data_ids, data_points, center, id_, distances, True)
 
     def get_ring_of_data(self, width):
-        # if width <= 0:
-        #     return self.sorted_data, self.sorted_data_ids
-        ring_indices = np.where(self.sorted_distances > self.radius - width)[0]
-        return self.sorted_data[ring_indices], self.sorted_data_ids[ring_indices]
+        if width <= 0:
+            return self.data_points, self.data_ids
+        ring_indices = np.where(self._distances > self.radius - width)[0]
+        return self.data_points[ring_indices], self.data_ids[ring_indices]
 
 
 class OurMethod:
@@ -39,18 +30,26 @@ class OurMethod:
     def number_of_features(self):
         return self.clusters_centers.shape[1]
 
-    def __init__(self, name, clusters_path, simulation = True):
-        self.name = name
+    @property
+    def clusters_radii(self):
+        return self._clusters_db.radii
+
+    @property
+    def clusters_centers(self):
+        return self._clusters_db.centers
+
+    @property
+    def clusters_count(self):
+        return self._clusters_db.count
+
+    @property
+    def number_of_clusters(self):
+        return len(self.clusters_count)
+
+    def __init__(self, clusters_db, simulation=False):
         self.simulation = simulation
         self.similarity_function = OurMethod.euclidean_distance
-        clusters_radii = pd.read_csv(os.path.join(clusters_path, self.name, 'radii.csv'), index_col=0).values
-        self.clusters_radii = clusters_radii.reshape(clusters_radii.size,)
-        self.number_of_clusters = len(self.clusters_radii)
-        self.clusters_path = clusters_path
-        self.clusters_centers = pd.read_csv(os.path.join(clusters_path, self.name, 'centers.csv'), index_col=0).values
-        self.clusters = {}
-        data_per_cluster = pd.read_csv(os.path.join(clusters_path, self.name, 'sizes.csv'), index_col=0).values
-        self.data_per_cluster = data_per_cluster.reshape(data_per_cluster.size,)
+        self._clusters_db = clusters_db
 
     def query(self, target, k):
         self.number_of_step1_distance_calculations = 0
@@ -58,6 +57,7 @@ class OurMethod:
         self.number_of_data_after_filter = 0
         distances_target_to_centers = dist.cdist(np.array(np.matrix(target)), self.clusters_centers)[0]
        # distances_target_to_cluster_borders = distances_target_to_centers - self.clusters_radii
+
         self.number_of_step1_distance_calculations += len(self.clusters_centers)
         tau = 0
         n_searching_data = 0
@@ -69,7 +69,7 @@ class OurMethod:
             distance_to_cluster = distances_target_to_centers[closest_cluster_index]
             if distance_to_cluster > tau:
                 tau = distance_to_cluster
-            number_of_data_in_cluster = self.get_cluster(closest_cluster_index).number_of_data
+            number_of_data_in_cluster = self.get_cluster(closest_cluster_index).count
             n_searching_data += number_of_data_in_cluster
             i += 1
         searching_clusters_mask = np.zeros(self.number_of_clusters).astype(np.bool)
@@ -90,13 +90,11 @@ class OurMethod:
         self.number_of_data_after_filter = len(searching_data)
         return self.brute_force_search_vectorized(target, searching_data, searching_data_ids, k)
 
-
     def get_cluster(self, index):
         if not index in self.clusters:
             cluster_data_df = pd.read_csv(os.path.join(self.clusters_path, self.name, 'class{0}.csv'.format(index)), index_col=0)
             self.clusters[index] = OurMethodCluster(self.clusters_centers[index], cluster_data_df)
         return self.clusters[index]
-
 
     def brute_force_search_vectorized(self, target, candidates, candidates_ids, k):
         self.number_of_step2_distance_calculations += len(candidates)

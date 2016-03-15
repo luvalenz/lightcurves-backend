@@ -85,7 +85,8 @@ df = pd.DataFrame(X, index=[hex(i) for i in range(len(X))])
 
 threshold = 3
 outlier_rate = 1
-brc = Birch(threshold, False, n_global_clusters=5, cluster_distance_measure='d1', 'r', branching_factor=outlier_rate)
+n_clusters = 5
+brc = Birch(threshold, True, True, n_clusters)
 add_data_frame(brc, df.iloc[0:n*5])
 test(brc, df)
 

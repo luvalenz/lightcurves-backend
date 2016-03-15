@@ -67,6 +67,10 @@ class ClustersDataBase:
     def defragment(self):
         pass
 
+    @abstractmethod
+    def get_all(self):
+        pass
+
 
 class ClustersMongoDataBase(ClustersDataBase):
 
@@ -97,7 +101,7 @@ class ClustersMongoDataBase(ClustersDataBase):
     def __init__(self, db_name='clusters', url='localhost', port=27017):
         self.client = MongoClient(url, port)
         self.db_name = db_name
-        self.db = self.client[db_name]
+        self._database = self.client[db_name]
         self._info_loaded = False
 
     def setup(self):
@@ -105,24 +109,24 @@ class ClustersMongoDataBase(ClustersDataBase):
 
     def reset_database(self):
         self.client.drop_database(self.db_name)
-        self.db = self.client[self.db_name]
+        self._database = self.client[self.db_name]
         self._info_loaded = False
-        info_collection = self.db['info']
+        info_collection = self._database['info']
         info_collection.create_index([("id", pymongo.ASCENDING)], background=True, unique=True)
 
     def store_cluster(self, index, cluster):
         document_list = cluster.to_list_of_dicts()
-        cluster_collection = self.db[str(index)]
+        cluster_collection = self._database[str(index)]
         cluster_collection.insert_many(document_list)
         cluster_collection.create_index([("distance", pymongo.ASCENDING)])
-        info_collection = self.db['info']
+        info_collection = self._database['info']
         info = cluster.get_info()
         info['id'] = index
         info_collection.insert_one(info)
 
     def _load_info(self):
         self._info_loaded = True
-        info_cursor = self.db['info'].find().sort('id', pymongo.ASCENDING)
+        info_cursor = self._database['info'].find().sort('id', pymongo.ASCENDING)
         ids = []
         radii = []
         counts = []
@@ -138,8 +142,8 @@ class ClustersMongoDataBase(ClustersDataBase):
         self._centers = np.array(centers)
 
     def _get_cluster_info(self, cluster_id):
-        info_collection = self.db['info']
-        return info_collection.find_one({'id': str(cluster_id)})
+        info_collection = self._database['info']
+        return info_collection.find_one({'id': int(cluster_id)})
 
     def get_radius(self, cluster_id):
         return self._get_cluster_info(cluster_id)['radius']
@@ -151,8 +155,8 @@ class ClustersMongoDataBase(ClustersDataBase):
         return self._get_cluster_info(cluster_id)['count']
 
     def get_cluster_data(self, cluster_id):
-        data_points = list(self._get_cluster_data_points_cursor(cluster_id))
-        cluster = Cluster.from_list_of_dicts(data_points)
+        data_point_list_of_dicts = list(self._get_cluster_data_points_cursor(cluster_id))
+        cluster = Cluster.from_list_of_dicts(data_point_list_of_dicts, None, cluster_id, False)
         return cluster.data_points
 
     def get_data_ids(self, cluster_id):
@@ -163,21 +167,23 @@ class ClustersMongoDataBase(ClustersDataBase):
         return ids
 
     def get_cluster(self, cluster_id):
-        center = self.db['info'].find_one({'id': cluster_id})['center']
+        center = self._database['info'].find_one({'id': cluster_id})['center']
         data_points = list(self._get_cluster_data_points_cursor(cluster_id))
-        return Cluster.from_list_of_dicts(data_points, cluster_id, center)
+        return Cluster.from_list_of_dicts(data_points, center, cluster_id, False)
 
     def _get_cluster_data_points_cursor(self, cluster_id):
-        return self.db[str(cluster_id)].find().sort('id', pymongo.ASCENDING)
+        return self._database[str(cluster_id)].find().sort('id', pymongo.ASCENDING)
 
     def defragment(self):
-        collection_names = self.db.collection_names()
-        if 'system.indexes' in collection_names:
-            collection_names.remove('system.indexes')
+        collection_names = self._database.collection_names()
+        collection_names.remove('system.indexes')
         results = {}
         for collection_name in collection_names:
-            results[collection_name] = self.db.command('compact', collection_name)
+            results[collection_name] = self._database.command('compact', collection_name)
         return results
+
+    def get_all(self):
+        return MongoClustersIterator(self)
 
 
 class Cluster:
@@ -206,16 +212,19 @@ class Cluster:
     def center(self):
         return self._center
 
-    def __init__(self, data_ids, data_points, center, id_= None, distances=None):
-        if distances is None:
-            distances = cdist(np.matrix(center), np.matrix(data_points))[0]
-        order = np.argsort(distances)
+    def __init__(self, data_ids, data_points, center, id_=None, distances=None, sort=True):
+        if sort:
+            if distances is None:
+                distances = cdist(np.matrix(center), np.matrix(data_points))[0]
+            order = np.argsort(distances)
+            data_points = np.array(data_points)[order]
+            distances = np.array(distances[order])
+            data_ids = list(np.array(data_ids)[order])
         self._center = center
-        self._data_points = np.array(data_points[order])
-        self._distances = np.array(distances[order])
-        data_ids = np.array(data_ids)
-        self._data_point_ids = list(data_ids[order])
         self._id = id_
+        self._data_point_ids = data_ids
+        self._data_points = np.array(data_points)
+        self._distances = np.array(distances)
 
     @staticmethod
     def from_pandas_data_frame(dataframe, center):
@@ -227,15 +236,15 @@ class Cluster:
         return Cluster(data_indices, data_points, center, distances)
 
     @staticmethod
-    def from_list_of_dicts(data_point_list, id_=None, center=None):
+    def from_list_of_dicts(data_point_list, center=None, id_=None, sort=False):
         data_ids= []
         values = []
         distances = []
         for data_point_dictionary in data_point_list:
             data_ids.append(data_point_dictionary['id'])
             values.append(data_point_dictionary['values'])
-            distances.append(data_point_dictionary['distances'])
-        return Cluster(data_ids, values, center, id_)
+            distances.append(data_point_dictionary['distance'])
+        return Cluster(data_ids, values, center, id_, distances, sort)
 
     @staticmethod
     def from_time_series_sequence(time_series_sequence, center, id_):
@@ -319,11 +328,10 @@ class ClustersIterator(object):
 
 
 class DatabaseClustersIterator(object):
-
     __metaclass__ = ABCMeta
 
     @abstractmethod
-    def __init__(self, batch= True, batch_size=3*10**5):
+    def __init__(self, clusters_db):
         pass
 
     @abstractmethod
@@ -343,50 +351,27 @@ class DatabaseClustersIterator(object):
         pass
 
 
-class MongoClustersIterator(DatabaseClustersIterator):
+class MongoClustersIterator(object):
+    __metaclass__ = ABCMeta
 
-    def __init__(self, database, batch=True, batch_size=3*10**5):
-        self._batch = batch
-        self._database = database
-        self._batch_size = batch_size
-        self._current_cluster_index = 0
-        self._clusters_ids = database.clusters_ids
+    def __init__(self, clusters_db):
+        self._database = clusters_db
+        self._ids = self._database.cluster_ids
+        self._current_index = 0
 
     def __len__(self):
-        return len(self._clusters_ids)
+        return len(self._ids)
 
     def __iter__(self):
         return self
 
-    def next_unit(self):
-        if self._current_cluster_index >= len(self):
-            raise StopIteration
-        current_cluster_id = self._clusters_ids[self._current_cluster_index]
-        current_cluster = self._database.get_cluster(current_cluster_id)
-        self._current_cluster_index += 1
-        return current_cluster
-
-    def next_batch(self):
-        clusters_batch = []
-        i = 0
-        while True:
-            try:
-                clusters = self.next_unit()
-                clusters_batch.append(clusters)
-            except StopIteration:
-                break
-            if i == self._batch_size - 1:
-                break
-            i += 1
-        if len(clusters_batch) == 0:
-            raise StopIteration
-        return clusters_batch
-
     def next(self):
-        if self._batch:
-            return self.next_batch()
-        else:
-            return self.next_unit()
+        if self._current_index >= len(self):
+            raise StopIteration
+        id_ = self._ids[self._current_index]
+        cluster = self._database.get_cluster(id_)
+        self._current_index += 1
+        return cluster
 
     def rewind(self):
-        self._current_cluster_index = 0
+        self._current_index = 0
