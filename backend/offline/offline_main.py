@@ -61,4 +61,3 @@ if __name__ == "__main__":
     clustering_db = interface.get_clustering_database()
     clusters_iterator = clustering_db.get_all()
     plot_clusters(clusters_iterator)
-

@@ -222,7 +222,7 @@ class Cluster:
             data_ids = list(np.array(data_ids)[order])
         self._center = center
         self._id = id_
-        self._data_point_ids = data_ids
+        self._data_point_ids = np.array(data_ids)
         self._data_points = np.array(data_points)
         self._distances = np.array(distances)
 
@@ -271,6 +271,10 @@ class Cluster:
             list_of_dicts.append(element)
         return list_of_dicts
 
+    def get_ring_of_data(self, width):
+        ring_indices = np.where(self._distances >= self.radius - width)[0]
+        return self.data_points[ring_indices], self.data_point_ids[ring_indices]
+
     def get_info(self):
         return {'id': self.id, 'radius': self.radius, 'count': self.count, 'center': list(self.center)}
 
@@ -296,7 +300,6 @@ class ClustersIterator(object):
             raise StopIteration
         data_ids = self._clusters[self._current_cluster_index]
         center = self._centers[self._current_cluster_index]
-        cluster_time_series = []
         time_series_iterator = self._time_series_db.get_many(data_ids, None, False)
         cluster_obj = Cluster.from_time_series_sequence(time_series_iterator, center, self._current_cluster_index)
         self._current_cluster_index += 1

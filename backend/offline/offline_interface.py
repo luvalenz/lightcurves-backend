@@ -153,5 +153,10 @@ class OfflineInterface(object):
         for i, cluster in itertools.izip(xrange(len(clusters_iterator)), clusters_iterator):
             clustering_db.store_cluster(i, cluster)
 
+    def get_clusters(self, clustering_db_index):
+        clustering_db = self.get_clustering_database(clustering_db_index)
+        return clustering_db.get_all_clusters(False)
+
+
 
 

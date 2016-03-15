@@ -6,19 +6,6 @@ import scipy.spatial.distance as dist
 import os
 
 
-class OurMethodCluster:
-
-
-    def __init__(self, data_ids, data_points, center, id_=None, distances=None):
-        super(self, OurMethodCluster).__init__(data_ids, data_points, center, id_, distances, True)
-
-    def get_ring_of_data(self, width):
-        if width <= 0:
-            return self.data_points, self.data_ids
-        ring_indices = np.where(self._distances > self.radius - width)[0]
-        return self.data_points[ring_indices], self.data_ids[ring_indices]
-
-
 class OurMethod:
 
     @property
@@ -38,12 +25,16 @@ class OurMethod:
         return self._clusters_db.centers
 
     @property
-    def clusters_count(self):
-        return self._clusters_db.count
+    def clusters_counts(self):
+        return self._clusters_db.counts
+
+    @property
+    def clusters_ids(self):
+        return self._clusters_db.cluster_ids
 
     @property
     def number_of_clusters(self):
-        return len(self.clusters_count)
+        return len(self.clusters_counts)
 
     def __init__(self, clusters_db, simulation=False):
         self.simulation = simulation
@@ -55,20 +46,21 @@ class OurMethod:
         self.number_of_step2_distance_calculations = 0
         self.number_of_data_after_filter = 0
         distances_target_to_centers = dist.cdist(np.array(np.matrix(target)), self.clusters_centers)[0]
-       # distances_target_to_cluster_borders = distances_target_to_centers - self.clusters_radii
-
+        cluster_order_by_distance = np.argsort(distances_target_to_centers)
         self.number_of_step1_distance_calculations += len(self.clusters_centers)
         tau = 0
         n_searching_data = 0
         searching_clusters_indices = []
         i = 0
         while n_searching_data < k:
-            closest_cluster_index = np.argpartition(distances_target_to_centers, i)[i] #ith smaller distance
+            closest_cluster_index = cluster_order_by_distance[i] #ith closest cluster
             searching_clusters_indices.append(closest_cluster_index)
             distance_to_cluster = distances_target_to_centers[closest_cluster_index]
-            if distance_to_cluster > tau:
-                tau = distance_to_cluster
-            number_of_data_in_cluster = self.get_cluster(closest_cluster_index).count
+            cluster_radius = self.clusters_radii[closest_cluster_index]
+            new_tau = distance_to_cluster + cluster_radius
+            if new_tau > tau:
+                tau = new_tau
+            number_of_data_in_cluster = self.clusters_counts[closest_cluster_index]
             n_searching_data += number_of_data_in_cluster
             i += 1
         searching_clusters_mask = np.zeros(self.number_of_clusters).astype(np.bool)
@@ -90,10 +82,7 @@ class OurMethod:
         return self.brute_force_search_vectorized(target, searching_data, searching_data_ids, k)
 
     def get_cluster(self, index):
-        if not index in self.clusters:
-            cluster_data_df = pd.read_csv(os.path.join(self.clusters_path, self.name, 'class{0}.csv'.format(index)), index_col=0)
-            self.clusters[index] = OurMethodCluster(self.clusters_centers[index], cluster_data_df)
-        return self.clusters[index]
+        return self._clusters_db.get_cluster(self.clusters_ids[index])
 
     def brute_force_search_vectorized(self, target, candidates, candidates_ids, k):
         self.number_of_step2_distance_calculations += len(candidates)
@@ -101,8 +90,7 @@ class OurMethod:
             distances = dist.cdist(np.matrix(target), candidates)[0]
             order = distances.argsort()
             sorted_distances = distances[order]
-            sorted_ids = candidates_ids[order]
-            #print(sorted_ids)
+            sorted_ids = candidates_ids[order].tolist()
             return sorted_ids[:k], sorted_distances[:k]
 
     def calculate_distance(self, v1, v2, step, number_of_operations=None, **kwargs):
