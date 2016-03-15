@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 import scipy.spatial.distance as dist
 import os
-from backend.data_model.clusters import Cluster
 
 
 class OurMethodCluster:
