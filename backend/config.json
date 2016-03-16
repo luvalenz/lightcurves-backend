@@ -3,7 +3,7 @@
           [
             {
               "type": "birch",
-              "parameters": [2, true, true, 5]
+              "parameters": [2, true, true, 15]
             }
           ],
   "reduction_algorithms":
@@ -22,7 +22,7 @@
             { "type": "macho",
               "parameters":
               [
-               "/media/lucas/115d830f-0d51-49ad-8a2f-84544fbab639/macho2",
+               "/media/lucas/115d830f-0d51-49ad-8a2f-84544fbab639/MACHO_LMC",
                 "/media/lucas/115d830f-0d51-49ad-8a2f-84544fbab639/MACHO_features_Harmonics"
               ]
             }

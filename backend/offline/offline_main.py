@@ -1,4 +1,5 @@
 from backend.offline.offline_interface import OfflineInterface
+from backend.data_model.data_model_interface import DataModelInterface, load_config
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -35,29 +36,32 @@ def plot_clusters(clusters):
 
 
 if __name__ == "__main__":
-    interface = OfflineInterface()
-    # #ts_db = interface.get_time_series_database()
-    # #transfer data
-    # ids = interface.transfer_time_series('macho', 1,0)
-    # print ids
+
+
+    config = load_config('/home/lucas/PycharmProjects/lightcurves-backend/backend/config.json')
+    data_model_interface = DataModelInterface(config)
+    offline_interface = OfflineInterface(data_model_interface)
+
+    # ids = offline_interface.transfer_time_series('macho', 1, 0)
+
     # #calculate features
     # #interface.calculate_missing_features(0, 5)
     # #interface.recalculate_all_features(0, 5)
     # #setup
-    # #interface._setup()
+    # offline_interface.setup()
     # #reduce dimensionality
-    # interface.reduce_some(ids, 'macho', 0, 0, 0)
+    # offline_interface.reduce_all()
     # #cluster
-    #interface.cluster_all()
-    #clustering_model = interface.get_clustering_model(0,0)
-    # # print(clustering_model)
-    #mongodb = interface.get_time_series_database()
-    #local_centers, local_clusters = clustering_model.get_cluster_list(mode='local')
-    #plot_cluster_list(local_centers, local_clusters, mongodb)
-    #global_centers, global_clusters = clustering_model.get_cluster_list(mode='global')
-    #plot_cluster_list(global_centers, global_clusters, mongodb)
-    #interface.store_all_clusters()
+    # offline_interface.cluster_all()
+    # clustering_model = data_model_interface.get_clustering_model(0,0)
+    # mongodb = data_model_interface.get_time_series_database()
+    # local_centers, local_clusters = clustering_model.get_cluster_list(mode='local')
+    # plot_cluster_list(local_centers, local_clusters, mongodb)
+    # global_centers, global_clusters = clustering_model.get_cluster_list(mode='global')
+    # #plot_cluster_list(global_centers, global_clusters, mongodb)
+    offline_interface.store_all_clusters()
     #interface.get_clustering_model(0,0)
-    clustering_db = interface.get_clustering_database()
-    clusters_iterator = clustering_db.get_all()
-    plot_clusters(clusters_iterator)
+
+    # clustering_db = interface.get_clustering_database()
+    # clusters_iterator = clustering_db.get_all()
+    # plot_clusters(clusters_iterator)

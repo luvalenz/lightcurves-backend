@@ -86,12 +86,12 @@ offline_interface = OfflineInterface()
 # serialization_db = offline_interface.get_serialization_database()
 # offline_interface.store_all_clusters()
 
-clusters_db = offline_interface.get_clustering_database()
+clusters_db = offline_interface.get_clustering_database(2)
 clusters = clusters_db.get_all()
 target = [23.6, 26.3]
 plot_clusters(clusters)
 our_method = OurMethod(clusters_db)
-ids, distances = our_method.query(target, 3)
+ids, distances = our_method.vector_query(target, 3)
 print ids
 
 time_series_db = offline_interface.get_time_series_database()

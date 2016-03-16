@@ -137,10 +137,10 @@ class MachoFileDataBase(TimeSeriesDataBase):
         ids = [path.split('_')[-1][:-6] for path in paths if path.endswith('.mjd')]
         ids = sorted(list(set(ids)))
         band_names = ['B', 'R']
-        bands_dict = {}
-        metadata_dict = None
         list_of_dicts = []
         for id_ in ids:
+            bands_dict = {}
+            metadata_dict = None
             seq = id_.split('.')[-1]
             for band_name in band_names:
                 band_path = 'F_{0}/{1}/lc_{2}.{3}.mjd'.format(field, tile, id_, band_name)
@@ -230,7 +230,7 @@ class MachoFileDataBase(TimeSeriesDataBase):
 
 class MongoTimeSeriesDataBase(TimeSeriesDataBase):
 
-    def __init__(self, batch_size=3*10**5, db_name='lightcurves', url='localhost', port=27017):
+    def __init__(self, batch_size=6*10**5, db_name='lightcurves', url='localhost', port=27017):
         client = MongoClient(url, port)
         self.db = client[db_name]
         self._batch_size = batch_size
@@ -533,7 +533,7 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
         if feature_dict is None:
             feature_dict = {}
         if metadata_dict is None:
-            feature_dict = {}
+            metadata_dict = {}
         self._set_bands(band_names, times, values, errors, phase)
         self._set_features(feature_dict)
         self._set_metadata(metadata_dict)
@@ -684,9 +684,9 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
         for band_name in self._band_names:
             band = self.get_band(band_name)
             bands[band_name] = band.to_dict()
-        dictionary['features'] = self._feature_dictionary.copy()
+        dictionary['features'] = self._feature_dictionary.copy() if self._feature_dictionary is not None else None
         dictionary['bands'] = bands
-        dictionary['metadata'] = self._metadata.copy()
+        dictionary['metadata'] = self._metadata.copy() if self._metadata is not None else None
         dictionary['id'] = self.id
         dictionary['reduced'] = list(self._reduced_vector) if self._reduced_vector is not None else None
         return dictionary
@@ -803,7 +803,7 @@ class TimeSeriesIterator(object):
 
 class MongoTimeSeriesIterator(TimeSeriesIterator):
 
-    def __init__(self, cursors, batch=True, batch_size=3*10**5):
+    def __init__(self, cursors, batch=True, batch_size=5*10**5):
         self._batch = batch
         self._batch_size = batch_size
         self._cursors = [cursor.clone() for cursor in cursors]
@@ -885,7 +885,9 @@ class MachoTimeSeriesIterator(TimeSeriesIterator):
             self._current_field += 1
         if self._current_field > self._n_fields:
             raise StopIteration
-        batch = self._database.get_many(self._current_field, self._current_field_tiles[self._current_tile_index])
+        current_tile = self._current_field_tiles[self._current_tile_index]
+        print('MACHO: Getting field {0}, tile {1}'.format(self._current_field, current_tile))
+        batch = self._database.get_many(self._current_field, current_tile)
         self._current_tile_index += 1
         return batch
 

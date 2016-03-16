@@ -7,23 +7,15 @@ from backend.data_model.clusters import ClustersMongoDataBase, Cluster
 from backend.data_model.serializations import SerializationMongoDatabase
 
 
+def load_config(config_path):
+     with open(config_path) as data_file:
+        return json.load(data_file)
+
+
 class DataModelInterface(object):
 
-    __instance = None
-
-    def __new__(cls):
-        if cls.__instance is None:
-            cls.__instance = object.__new__(cls)
-            cls.__instance.set_config()
-        return cls.__instance
-
-    def set_config(self):
-        config_dir = os.path.dirname(os.path.dirname(__file__))
-        config_path = os.path.join(config_dir, 'config.json')
-        with open(config_path) as data_file:
-            data = json.load(data_file)
-            self.config = data
-
+    def __init__(self, config):
+        self._config = config
 
     def get_reduction_model(self, serializing_db_index=0, model_index=0):
         serializing_db = self.get_serialization_database(serializing_db_index)
@@ -31,7 +23,7 @@ class DataModelInterface(object):
         if serializing_db.has_reduction_model:
             return serializing_db.reduction_model
         else:
-            model_info = self.config['reduction_algorithms'][model_index]
+            model_info = self._config['reduction_algorithms'][model_index]
             model_type = model_info['type']
             parameters = model_info['parameters']
             if model_type == 'ipca':
@@ -43,7 +35,7 @@ class DataModelInterface(object):
         if serializing_db.has_clustering_model:
             return serializing_db.clustering_model
         else:
-            model_info = self.config['clustering_algorithms'][model_index]
+            model_info = self._config['clustering_algorithms'][model_index]
             model_type = model_info['type']
             parameters = model_info['parameters']
             if model_type == 'birch':
@@ -51,7 +43,7 @@ class DataModelInterface(object):
             return Model(*parameters)
 
     def get_time_series_database(self, index=0):
-        db_info = self.config['time_series_databases'][index]
+        db_info = self._config['time_series_databases'][index]
         model_type = db_info['type']
         parameters = db_info['parameters']
         if model_type == 'mongodb':
@@ -61,7 +53,7 @@ class DataModelInterface(object):
         return Database(*parameters)
 
     def get_clustering_database(self, index=0):
-        db_info = self.config['clustering_databases'][index]
+        db_info = self._config['clustering_databases'][index]
         model_type = db_info['type']
         parameters = db_info['parameters']
         if model_type == 'mongodb':
@@ -69,7 +61,7 @@ class DataModelInterface(object):
         return Database(*parameters)
 
     def get_serialization_database(self, index=0):
-        db_info = self.config['serializing_databases'][index]
+        db_info = self._config['serializing_databases'][index]
         model_type = db_info['type']
         parameters = db_info['parameters']
         if model_type == 'mongodb':

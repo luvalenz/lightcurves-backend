@@ -794,17 +794,13 @@ class IncrementalPCA(IncrementalDimensionalityReduction):
         self._W = None
         self.data_ids = []
 
-    @staticmethod
-    def standarize(X):
-        mean = np.mean(X, axis=0)
-        std = np.std(X, axis=0)
-        return np.nan_to_num((X - mean)/std)
+    def standarize(self, x):
+        return np.nan_to_num((x - self.mean)/self.std)
 
-    @staticmethod
-    def cov(X):
-        X_std = IncrementalPCA.standarize(X)
-        n = len(X)
-        return np.nan_to_num(np.matrix(X_std).T*np.matrix(X_std))/n
+    def cov(self, x):
+        x_std = self.standarize(x)
+        n = len(x)
+        return np.nan_to_num(np.matrix(x_std).T*np.matrix(x_std))/n
 
     @staticmethod
     def xtx(cov, std, mean, n):
@@ -861,9 +857,9 @@ class IncrementalPCA(IncrementalDimensionalityReduction):
         if self.n_components is not None:
             self._W = self._W[:,:self.n_components]
 
-    def _transform_data_matrix(self, X):
-        standarized_X = IncrementalPCA.standarize(X)
-        return np.dot(standarized_X, self.W)
+    def _transform_data_matrix(self, x):
+        standarized_x = self.standarize(x)
+        return np.dot(standarized_x, self.W)
 
     def _add_data_matrix(self, x, ids):
         x = np.matrix(x)
@@ -872,10 +868,10 @@ class IncrementalPCA(IncrementalDimensionalityReduction):
         self.data_ids += ids
         self._W = None
         if self.cov is None:
-            self.cov = IncrementalPCA.cov(x)
             self.mean = np.mean(x, axis= 0)
             self.std = np.std(x, axis=0)
             self.n = len(x)
+            self.cov = self.cov(x)
         else:
             self.cov, self.mean, self.std = IncrementalPCA.cov_stack(x, self.mean, self.cov, self.std, self.n)
             # if np.isnan(np.sum(self.cov)):
@@ -911,7 +907,7 @@ class IncrementalPCA(IncrementalDimensionalityReduction):
         added_time_series, ids, feature_matrix = self._extract_feature_matrix(time_series_list, True)
         if feature_matrix is not None:
             self._add_data_matrix(feature_matrix, ids)
-        return feature_matrix
+        return len(ids)
 
     def transform_time_series(self, time_series_list):    
         added_time_series, ids, feature_matrix = self._extract_feature_matrix(time_series_list, False)

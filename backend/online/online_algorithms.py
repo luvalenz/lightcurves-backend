@@ -1,9 +1,7 @@
 __author__ = 'lucas'
 
 import numpy as np
-import pandas as pd
 import scipy.spatial.distance as dist
-import os
 
 
 class OurMethod:
@@ -36,12 +34,19 @@ class OurMethod:
     def number_of_clusters(self):
         return len(self.clusters_counts)
 
-    def __init__(self, clusters_db, simulation=False):
+    def __init__(self, clusters_db, time_series_db, simulation=False):
         self.simulation = simulation
         self.similarity_function = OurMethod.euclidean_distance
         self._clusters_db = clusters_db
+        self._time_series_db = time_series_db
 
-    def query(self, target, k):
+    def time_series_query(self, target, k):
+        reduced_vector = target.reduced_vector
+        retrieved_ids, retrieved_distances = self.vector_query(reduced_vector, k)
+        retrieved_time_series = self._time_series_db.get_many(retrieved_ids, None, False)
+        return retrieved_time_series, retrieved_distances
+
+    def vector_query(self, target, k):
         self.number_of_step1_distance_calculations = 0
         self.number_of_step2_distance_calculations = 0
         self.number_of_data_after_filter = 0
