@@ -4,6 +4,10 @@
             {
               "type": "birch",
               "parameters": [2, true, true, 15]
+            },
+            {
+              "type": "birch",
+              "parameters": [2.5, true, true, 4]
             }
           ],
   "reduction_algorithms":
@@ -25,20 +29,34 @@
                "/media/lucas/115d830f-0d51-49ad-8a2f-84544fbab639/MACHO_LMC",
                 "/media/lucas/115d830f-0d51-49ad-8a2f-84544fbab639/MACHO_features_Harmonics"
               ]
+            },
+            {
+              "type": "mongodb",
+              "parameters": [30000, "lightcurves_testing", "localhost", 27017]
             }
+
           ],
   "clustering_databases":
           [
             {
               "type": "mongodb",
               "parameters": ["clusters", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["clusters_testing", "localhost", 27017]
             }
+
           ],
-  "serializing_databases":
+  "serialization_databases":
           [
             {
               "type": "mongodb",
               "parameters": ["serializations", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["serializations_testing", "localhost", 27017]
             }
           ]
  }

@@ -797,7 +797,7 @@ class IncrementalPCA(IncrementalDimensionalityReduction):
     def standarize(self, x):
         return np.nan_to_num((x - self.mean)/self.std)
 
-    def cov(self, x):
+    def calculate_cov(self, x):
         x_std = self.standarize(x)
         n = len(x)
         return np.nan_to_num(np.matrix(x_std).T*np.matrix(x_std))/n
@@ -809,10 +809,6 @@ class IncrementalPCA(IncrementalDimensionalityReduction):
         xtx_ = n*np.multiply(a,cov)
         return xtx_ + n*b
 
-    @staticmethod
-    def var_inc(d, new_row, x_mean, n):
-        new_row_sq = np.matrix(np.array(new_row)**2)
-        return (d + new_row_sq)/(n + 1) - np.matrix(np.array((n*x_mean + new_row)/(n+1))**2)
 
     @staticmethod
     def cov_stack(x2, x1_mean, x1_cov, x1_std, n1):
@@ -871,7 +867,7 @@ class IncrementalPCA(IncrementalDimensionalityReduction):
             self.mean = np.mean(x, axis= 0)
             self.std = np.std(x, axis=0)
             self.n = len(x)
-            self.cov = self.cov(x)
+            self.cov = self.calculate_cov(x)
         else:
             self.cov, self.mean, self.std = IncrementalPCA.cov_stack(x, self.mean, self.cov, self.std, self.n)
             # if np.isnan(np.sum(self.cov)):

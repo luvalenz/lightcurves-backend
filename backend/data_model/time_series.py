@@ -289,7 +289,9 @@ class MongoTimeSeriesDataBase(TimeSeriesDataBase):
 
     def get_many(self, id_list, catalog_name=None, batch=True, batch_size=None):
         query = {'id': {'$in': id_list}}
-        return self.find_many(catalog_name, query, batch, batch_size)
+        result = list(self.find_many(catalog_name, query, batch, batch_size))
+        result.sort(key=lambda x : id_list.index(x.id))
+        return result
 
     def metadata_search(self, catalog_name, **kwargs):
         query = []
@@ -408,6 +410,10 @@ class MultibandTimeSeries(object):
 
     @abstractmethod
     def __getitem__(self, item):
+        pass
+
+    @abstractmethod
+    def __contains__(self, item):
         pass
 
     @abstractproperty
@@ -630,6 +636,9 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
 
     def __getitem__(self, item):
         return self.get_band(item)
+
+    def __contains__(self, item):
+        return item in self._band_names
 
     @property
     def n_bands(self):

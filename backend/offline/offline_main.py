@@ -42,7 +42,8 @@ if __name__ == "__main__":
     data_model_interface = DataModelInterface(config)
     offline_interface = OfflineInterface(data_model_interface)
 
-    # ids = offline_interface.transfer_time_series('macho', 1, 0)
+
+    ids = offline_interface.transfer_time_series('macho', 1, 0)
 
     # #calculate features
     # #interface.calculate_missing_features(0, 5)
@@ -50,9 +51,9 @@ if __name__ == "__main__":
     # #setup
     # offline_interface.setup()
     # #reduce dimensionality
-    # offline_interface.reduce_all()
+    offline_interface.reduce_all()
     # #cluster
-    # offline_interface.cluster_all()
+    offline_interface.cluster_all()
     # clustering_model = data_model_interface.get_clustering_model(0,0)
     # mongodb = data_model_interface.get_time_series_database()
     # local_centers, local_clusters = clustering_model.get_cluster_list(mode='local')

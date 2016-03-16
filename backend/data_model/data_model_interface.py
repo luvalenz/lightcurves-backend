@@ -17,11 +17,11 @@ class DataModelInterface(object):
     def __init__(self, config):
         self._config = config
 
-    def get_reduction_model(self, serializing_db_index=0, model_index=0):
-        serializing_db = self.get_serialization_database(serializing_db_index)
+    def get_reduction_model(self, serialization_db_index=0, model_index=0):
+        serialization_db = self.get_serialization_database(serialization_db_index)
 
-        if serializing_db.has_reduction_model:
-            return serializing_db.reduction_model
+        if serialization_db.has_reduction_model:
+            return serialization_db.reduction_model
         else:
             model_info = self._config['reduction_algorithms'][model_index]
             model_type = model_info['type']
@@ -30,10 +30,10 @@ class DataModelInterface(object):
                 Model = IPCA
             return Model(*parameters)
 
-    def get_clustering_model(self, serializing_db_index=0, model_index=0):
-        serializing_db = self.get_serialization_database(serializing_db_index)
-        if serializing_db.has_clustering_model:
-            return serializing_db.clustering_model
+    def get_clustering_model(self, serialization_db_index=0, model_index=0):
+        serialization_db = self.get_serialization_database(serialization_db_index)
+        if serialization_db.has_clustering_model:
+            return serialization_db.clustering_model
         else:
             model_info = self._config['clustering_algorithms'][model_index]
             model_type = model_info['type']
@@ -61,7 +61,7 @@ class DataModelInterface(object):
         return Database(*parameters)
 
     def get_serialization_database(self, index=0):
-        db_info = self._config['serializing_databases'][index]
+        db_info = self._config['serialization_databases'][index]
         model_type = db_info['type']
         parameters = db_info['parameters']
         if model_type == 'mongodb':

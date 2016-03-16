@@ -18,7 +18,7 @@ class OnlineInterface(object):
     def feature_space_query(self, feature_dict, n_neighbours):
         time_series_target = DataMultibandTimeSeries.from_dict({'features': feature_dict})
         self._reduction_model.transform_time_series([time_series_target])
-        print time_series_target.reduced_vector
+        #print time_series_target.reduced_vector
         return self._indexing_model.time_series_query(time_series_target, n_neighbours)
 
     def time_series_space_query(self, time_series):
@@ -41,7 +41,5 @@ if __name__ == '__main__':
     time_series_ranking, distances = online_interface.feature_space_query(feature_dict, 10)
     for ts, distance in zip(time_series_ranking, distances):
         plot_time_series(ts)
-        print np.linalg.norm(np.array(ts_target.reduced_vector)-  np.array(ts.reduced_vector))
-        print distance
 
 
