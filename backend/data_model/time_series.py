@@ -157,7 +157,7 @@ class MachoFileDataBase(TimeSeriesDataBase):
             features_dict = {}
             if features:
                 features_dict = self.get_features(id_)
-            list_of_dicts.append({'bands': bands_dict, 'features': features_dict, 'metadata': metadata_dict, 'id': id_})
+            list_of_dicts.append({'bands': bands_dict, 'features': features_dict, 'metadata': metadata_dict, 'id': 'macho.{0}'.format(id_)})
         return list_of_dicts
 
     def get_all(self, n_fields=82):
@@ -230,7 +230,7 @@ class MachoFileDataBase(TimeSeriesDataBase):
 
 class MongoTimeSeriesDataBase(TimeSeriesDataBase):
 
-    def __init__(self, batch_size=6*10**5, db_name='lightcurves', url='localhost', port=27017):
+    def __init__(self, batch_size=3*10**5, db_name='lightcurves', url='localhost', port=27017):
         client = MongoClient(url, port)
         self.db = client[db_name]
         self._batch_size = batch_size
@@ -270,8 +270,8 @@ class MongoTimeSeriesDataBase(TimeSeriesDataBase):
         else:
             return None
 
-    def get_all(self, batch_size=None):
-        return self.find_many(None, {}, True, batch_size)
+    def get_all(self, batch=False, batch_size=None):
+        return self.find_many(None, {}, batch, batch_size)
 
     def find_many(self, catalog_name, query_dict, batch=True, batch_size=None):
         if batch_size is None:
@@ -287,10 +287,12 @@ class MongoTimeSeriesDataBase(TimeSeriesDataBase):
             cursors.append(cursor)
         return MongoTimeSeriesIterator(cursors, batch, batch_size)
 
-    def get_many(self, id_list, catalog_name=None, batch=True, batch_size=None):
+    def get_many(self, id_list, catalog_name=None, batch=True, batch_size=None, sorted=False):
         query = {'id': {'$in': id_list}}
-        result = list(self.find_many(catalog_name, query, batch, batch_size))
-        result.sort(key=lambda x : id_list.index(x.id))
+        result = self.find_many(catalog_name, query, batch, batch_size)
+        if sorted:
+            result = list(result)
+            result.sort(key=lambda x : id_list.index(x.id))
         return result
 
     def metadata_search(self, catalog_name, **kwargs):
@@ -303,12 +305,24 @@ class MongoTimeSeriesDataBase(TimeSeriesDataBase):
     #receives TimeSeries
     def update_one(self, time_series):
         collection = self.db[time_series.catalog]
-        updated_datum = time_series.to_dict()
-        collection.replace_one({'id':time_series.id}, updated_datum)
 
-    def update_many(self, time_series_list):
-        for time_series in time_series_list:
-            self.update_one(time_series)
+    def update_many(self, time_series_sequence, only_reduced_vectors=False):
+        current_catalog = None
+        for time_series in time_series_sequence:
+            time_series_catalog = time_series.catalog
+            if current_catalog is None or time_series_catalog != current_catalog:
+                if current_catalog is not None:
+                    bulk.execute()
+                current_catalog = time_series_catalog
+                bulk = self.db[current_catalog].initialize_unordered_bulk_op()
+            if only_reduced_vectors:
+                if time_series.reduced_vector is not None:
+
+                    bulk.find({'id':time_series.id}).update_one({'$set': {'reduced': time_series.reduced_vector.tolist()}})
+            else:
+                updated_datum = time_series.to_dict()
+                bulk.find({'id':time_series.id}).replace_one(updated_datum)
+        bulk.execute()
 
     #can receive TimeSeries object or dict
     def add_one(self, catalog_name, datum):
@@ -591,7 +605,7 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
         self._metadata = metadata_dict.copy() if metadata_dict is not None else None
 
     def set_reduced(self, reduced_vector):
-        self._reduced_vector = list(reduced_vector) if reduced_vector is not None else None
+        self._reduced_vector = np.array(reduced_vector).flatten() if reduced_vector is not None else None
 
     @staticmethod
     def extract_bands_dict(bands_dict):
@@ -697,7 +711,7 @@ class DataMultibandTimeSeries(MultibandTimeSeries):
         dictionary['bands'] = bands
         dictionary['metadata'] = self._metadata.copy() if self._metadata is not None else None
         dictionary['id'] = self.id
-        dictionary['reduced'] = list(self._reduced_vector) if self._reduced_vector is not None else None
+        dictionary['reduced'] = self._reduced_vector.tolist() if self._reduced_vector is not None else None
         return dictionary
 
     def fold(self):
@@ -772,7 +786,7 @@ class TimeSeriesBand(object):
 
     def fold(self):
         t = self.period
-        self._phase = np.mod(self.times, t) / t
+        self._phase = np.mod(self.times.astype(np.float64), t) / t
 
     def to_dict(self):
         times = self.times.tolist()

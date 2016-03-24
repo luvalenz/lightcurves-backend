@@ -112,13 +112,15 @@ class ClustersMongoDataBase(ClustersDataBase):
         self._database = self.client[self.db_name]
         self._info_loaded = False
         info_collection = self._database['info']
+        clusters_collection = self._database['clusters']
         info_collection.create_index([("id", pymongo.ASCENDING)], background=True, unique=True)
+        clusters_collection.create_index([("id", pymongo.ASCENDING)], background=True, unique=True)
 
     def store_cluster(self, index, cluster):
-        document_list = cluster.to_list_of_dicts()
-        cluster_collection = self._database[str(index)]
-        cluster_collection.insert_many(document_list)
-        cluster_collection.create_index([("distance", pymongo.ASCENDING)])
+        data_points = cluster.to_list_of_dicts()
+        clusters_collection = self._database['clusters']
+        clusters_document = {'id': index, 'data': data_points}
+        clusters_collection.insert_one(clusters_document)
         info_collection = self._database['info']
         info = cluster.get_info()
         info['id'] = index
@@ -155,24 +157,21 @@ class ClustersMongoDataBase(ClustersDataBase):
         return self._get_cluster_info(cluster_id)['count']
 
     def get_cluster_data(self, cluster_id):
-        data_point_list_of_dicts = list(self._get_cluster_data_points_cursor(cluster_id))
+        data_point_list_of_dicts = self._database['clusters'].find_one({'id': cluster_id})
         cluster = Cluster.from_list_of_dicts(data_point_list_of_dicts, None, cluster_id, False)
         return cluster.data_points
 
     def get_data_ids(self, cluster_id):
-        cursor = self._get_cluster_data_points_cursor(cluster_id)
+        cluster = self._database['clusters'].find(cluster_id)
         ids = []
-        for element in cursor:
+        for element in cluster:
             ids.append(element['id'])
         return ids
 
     def get_cluster(self, cluster_id):
         center = self._database['info'].find_one({'id': cluster_id})['center']
-        data_points = list(self._get_cluster_data_points_cursor(cluster_id))
+        data_points = self._database['clusters'].find_one({'id': cluster_id})['data']
         return Cluster.from_list_of_dicts(data_points, center, cluster_id, False)
-
-    def _get_cluster_data_points_cursor(self, cluster_id):
-        return self._database[str(cluster_id)].find().sort('id', pymongo.ASCENDING)
 
     def defragment(self):
         collection_names = self._database.collection_names()

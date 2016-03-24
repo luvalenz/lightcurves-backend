@@ -44,13 +44,14 @@ class OfflineInterface(object):
         if self._clustering_model is None:
             self._clustering_model = self._data_model_interface.get_clustering_model\
                 (self._serialization_db_index, self._clustering_model_index)
-        return  self._clustering_model
+        return self._clustering_model
 
     @property
     def reduction_model(self):
         if self._reduction_model is None:
             self._reduction_model = self._data_model_interface.\
                 get_reduction_model(self._serialization_db_index, self._reduction_model_index)
+        return self._reduction_model
 
     #bust be called after adding elements and before reduction
     def setup(self):
@@ -61,7 +62,8 @@ class OfflineInterface(object):
     def transfer_time_series(self, catalog_name, source_database_index):
         source_db = self._data_model_interface.get_time_series_database(source_database_index)
         destination_db = self.time_series_db
-        batch_iterable = source_db.get_all()
+        batch_iterable = source_db.get_all(1)#todo borrar este 1
+
         added_ids = []
         for batch in batch_iterable:
             if len(batch) != 0:
@@ -90,7 +92,7 @@ class OfflineInterface(object):
                 print("DONE")
     
     def recalculate_all_features(self, batch_size=None):
-        batch_iterable = self.time_series_db.get_all(batch_size)
+        batch_iterable = self.time_series_db.get_all(True, batch_size)
         for batch in batch_iterable:
             updated = []
             for time_series in batch:
@@ -102,65 +104,60 @@ class OfflineInterface(object):
                 print("Updating values to database..."),
                 self.time_series_db.update_many(updated)
                 print("DONE")
-    
-    def reduce_all(self, batch_size=None):
-        batch_iterable = self.time_series_db.get_all(batch_size)
-        for time_series_list in batch_iterable:
-            print("Trying to add {0} time series to reduction model... ".format(len(time_series_list))),
-            n_updated = self.reduction_model.add_many_time_series(time_series_list)
-            print("DONE. {0} added successfully.".format(n_updated))
+
+    def _reduce(self, time_series_iterable):
+        print("Trying to add {0} time series to reduction model... ".format(len(time_series_iterable))),
+        n_added = self.reduction_model.add_many_time_series(time_series_iterable)
+        print("DONE, {0} added".format(n_added))
+        print("Fitting model... "),
+        self._reduction_model.fit()
+        print("DONE")
         print("Updating reduction model to database..."),
         self.serialization_db.store_reduction_model(self.reduction_model)
         print("DONE")
-        batch_iterable.rewind()
-        for time_series_list in batch_iterable:
-            print("Trying to reduce dimensionality of {0} time series... ".format(len(time_series_list))),
-            n_updated = self.reduction_model.transform_time_series(time_series_list)
+        if n_added > 0:
+            print("Calculating reduced vectors for {0} time series... ".format(n_added)),
+            all_time_series_iterator = self.time_series_db.get_all()
+            updated_time_series_iterator = self._reduction_model.transform_many_time_series(all_time_series_iterator)
             print("DONE")
-            if n_updated > 0:
-                print("Updating {0} time series to database...".format(n_updated)),
-                self.time_series_db.update_many(time_series_list)
-                print("DONE")
+            print("Updating all time series to database...")
+            self.time_series_db.update_many(updated_time_series_iterator, True)
+            print("DONE")
 
-    def reduce_some(self, time_series_ids, catalog_name=None, batch_size=None):
-        batch_iterable = self.time_series_db.get_many(time_series_ids, catalog_name, True, batch_size)
-        for time_series_list in batch_iterable:
-            print("Trying to reduce dimensionality of {0} time series... ".format(len(time_series_list))),
-            n_updated = self.reduction_model.add_transform_time_series(time_series_list)
-            print("DONE")
-            if n_updated > 0:
-                print("Updating {0} time series to database...".format(n_updated))
-                self.time_series_db.update_many(time_series_list)
-                print("DONE")
-                print("Updating reduction model to database..."),
-                self.serialization_db.store_reduction_model(self.reduction_model)
-            print("DONE")
+    def reduce_all(self):
+        time_series_iterator = self.time_series_db.get_all()
+        self._reduce(time_series_iterator)
+
+    def reduce_some(self, time_series_ids, catalog_name=None):
+        time_series_iterator = self.time_series_db.get_many(time_series_ids, catalog_name, False)
+        self._reduce(time_series_iterator)
+
+    def _cluster(self, time_series_sequence):
+        print("Trying to add {0} time series to clustering model... ".format(len(time_series_sequence))),
+        n_added = self.clustering_model.add_many_time_series(time_series_sequence)
+        print("{0} successfully added".format(n_added))
+        print("Updating clustering model to database..."),
+        self.serialization_db.store_clustering_model(self.clustering_model)
+        print("DONE")
     
     def cluster_all(self):
-        batch_iterable = self.time_series_db.get_all()
-        for time_series_list in batch_iterable:
-            print("Trying to add {0} time series to clustering model... ".format(len(time_series_list))),
-            n_added = self.clustering_model.add_many_time_series(time_series_list)
-            print("{0} added.".format(n_added))
-        print("Updating clustering model to database..."),
-        self.serialization_db.store_clustering_model(self.clustering_model)
-        print("DONE")
-    
+        time_series_sequence = self.time_series_db.get_all()
+        self._cluster(time_series_sequence)
+
     def cluster_some(self, time_series_ids, catalog_name=None):
-        batch_iterable = self.time_series_db.get_many(time_series_ids, catalog_name)
-        for time_series_list in batch_iterable:
-            print("Trying to add {0} time series to clustering model... ".format(len(time_series_list))),
-            n_added = self.clustering_model.add_many_time_series(time_series_list)
-            print("{0} added.".format(n_added))
-        print("Updating clustering model to database..."),
-        self.serialization_db.store_clustering_model(self.clustering_model)
-        print("DONE")
+        batch_iterable = self.time_series_db.get_many(time_series_ids, catalog_name, False)
+        self._cluster(batch_iterable)
     
     def store_all_clusters(self):
         self.clustering_db.reset_database()
+        n_clusters = int(self.clustering_model.get_number_of_clusters())
+        print("Storing {0} clusters...".format(n_clusters))
         clusters_iterator = self.clustering_model.get_cluster_iterator(self.time_series_db)
+        print("Iterator length: {0}".format(len(clusters_iterator)))
         for i, cluster in itertools.izip(xrange(len(clusters_iterator)), clusters_iterator):
             self.clustering_db.store_cluster(i, cluster)
+            if i > 0 and i % 500 == 0:
+                print "{0} clusters stored".format(i)
     
     def get_clusters(self):
         return self.clustering_db.get_all_clusters(False)

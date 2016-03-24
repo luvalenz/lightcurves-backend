@@ -43,7 +43,7 @@ class OurMethod:
     def time_series_query(self, target, k):
         reduced_vector = target.reduced_vector
         retrieved_ids, retrieved_distances = self.vector_query(reduced_vector, k)
-        retrieved_time_series = self._time_series_db.get_many(retrieved_ids, None, False)
+        retrieved_time_series = self._time_series_db.get_many(retrieved_ids, None, False, None, True)
         return retrieved_time_series, retrieved_distances
 
     def vector_query(self, target, k):

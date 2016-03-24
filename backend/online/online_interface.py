@@ -17,8 +17,7 @@ class OnlineInterface(object):
 
     def feature_space_query(self, feature_dict, n_neighbours):
         time_series_target = DataMultibandTimeSeries.from_dict({'features': feature_dict})
-        self._reduction_model.transform_time_series([time_series_target])
-        #print time_series_target.reduced_vector
+        self._reduction_model.transform_one_time_series(time_series_target)
         return self._indexing_model.time_series_query(time_series_target, n_neighbours)
 
     def time_series_space_query(self, time_series):
@@ -34,12 +33,19 @@ if __name__ == '__main__':
     config = load_config('/home/lucas/PycharmProjects/lightcurves-backend/backend/config.json')
     data_model_interface = DataModelInterface(config)
     online_interface = OnlineInterface(data_model_interface)
-    ts_target = data_model_interface.get_time_series_database().get_one('macho', '1.3447.36')
+    ts_target = data_model_interface.get_time_series_database().get_one('macho', 'macho.1.3447.36')
+    # serializations_database = data_model_interface.get_serialization_database(20)
+    # print serializations_database.db.name
+    # ipca = serializations_database._get_old_clustering_model()
+    # for i in range(20):
+    #     data_model_interface.get_serialization_database(i).store_reduction_model(ipca)
     print ts_target.reduced_vector
     feature_dict = ts_target.feature_dict
     plot_time_series(ts_target, 'red')
     time_series_ranking, distances = online_interface.feature_space_query(feature_dict, 10)
     for ts, distance in zip(time_series_ranking, distances):
         plot_time_series(ts)
+
+
 
 

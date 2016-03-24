@@ -5,11 +5,14 @@ from abc import ABCMeta, abstractmethod, abstractproperty
 import itertools
 import pandas as pd
 import scipy.spatial.distance as dist
+from scipy.misc import comb
 import os
 import pickle
 import operator
 import statsmodels.robust.scale as scale
 from ..data_model.clusters import ClustersIterator
+from ..data_model.time_series import DataMultibandTimeSeries
+import time
 
 #python 2
 
@@ -25,7 +28,14 @@ class IncrementalClustering:
         pass
 
     @abstractmethod
+    def add_one_time_series(self, time_series):
+        pass
+
+    @abstractmethod
     def add_many_time_series(self, time_series_list):
+        pass
+
+    def fit(self):
         pass
 
     @abstractmethod
@@ -53,7 +63,7 @@ class IncrementalClustering:
 
 class Birch(IncrementalClustering):
 
-    def __init__(self, threshold, remove_outliers=True, global_clustering=True, n_global_clusters=50,
+    def __init__(self, threshold, global_clustering=True, n_global_clusters=50,
                  cluster_distance_measure='d0', cluster_size_measure='r', branching_factor=50):
         self.branching_factor = branching_factor
         self.threshold = threshold
@@ -65,7 +75,6 @@ class Birch(IncrementalClustering):
         self._globally_labeled_data = None
         self._global_clustering = global_clustering
         self._n_global_clusters = n_global_clusters
-        self._remove_outliers = remove_outliers
 
     @property
     def count(self):
@@ -75,13 +84,22 @@ class Birch(IncrementalClustering):
             result += cf.count
         return result
 
+    def add_one_time_series(self, time_series):
+        self._locally_labeled_data = None
+        self._globally_labeled_data = None
+        return self._try_add_one_time_series(time_series)
+
     def add_many_time_series(self, time_series_list):
         self._locally_labeled_data = None
         self._globally_labeled_data = None
         n_added = 0
+        i = 0
         for time_series in time_series_list:
             if self._try_add_one_time_series(time_series):
                 n_added += 1
+            if i > 0 and i % 100000 == 0:
+                print("{0} added, out of {1} attempted...".format(n_added, i))
+            i += 1
         return n_added
 
     def get_cluster_list(self, **kwargs):
@@ -110,7 +128,6 @@ class Birch(IncrementalClustering):
     def get_cluster_iterator(self, time_series_database, **kwargs):
         centers, cluster_list = self.get_cluster_list(**kwargs)
         return ClustersIterator(time_series_database, cluster_list, centers)
-
 
     def is_fitted(self, **kwargs):
         global_clusters = self._global_clustering
@@ -211,16 +228,17 @@ class Birch(IncrementalClustering):
             self._do_global_clustering()
         return list(set(self.globally_labeled_data[:,1].astype(np.float32)
                         .astype(np.int32).tolist()))
+
     @property
     def number_of_local_labels(self):
         if not self.has_local_labels:
-            return None
+            self._generate_labels()
         return len(self.unique_local_labels)
 
     @property
     def number_of_global_labels(self):
         if not self.has_global_labels:
-            return None
+            self._do_global_clustering()
         return len(self.unique_global_labels)
 
     # def _generate_labels(self):
@@ -258,27 +276,6 @@ class Birch(IncrementalClustering):
         counts = np.array(counts)
         linear_sums = np.array(linear_sums)
         squared_norms = np.array(squared_norms)
-        if self._remove_outliers:
-            #print counts
-           # count_mean = np.mean(counts)
-            #print count_mean
-            #count_std = np.std(counts)
-            #count_mad = scale.mad(counts)
-            #print count_std
-            #print count_mad
-            #not_outliers = np.where(counts > count_mean - 4*count_mad)[0]
-            not_outliers = np.where(counts > 1)[0]
-            # order = np.argsort(counts)
-            # sorted_counts = counts[order]
-            # print sorted_counts
-            # gradient = np.diff(sorted_counts)
-            # print gradient
-            #not_outliers = order[np.min(np.argsort(gradient)[-3:]):]
-            counts = counts[not_outliers]
-            linear_sums = linear_sums[not_outliers]
-            squared_norms = squared_norms[not_outliers]
-            clusters_data_ids = [ids for i, ids in itertools.izip(xrange(len(clusters_data_ids)), clusters_data_ids)
-                                 if i in not_outliers]
         labels = []
         for i, ids in itertools.izip(xrange(len(clusters_data_ids)), clusters_data_ids):
             cluster_labels = np.column_stack((ids, i*np.ones(len(ids))))
@@ -293,21 +290,19 @@ class Birch(IncrementalClustering):
         linear_sums = self.linear_sums
         squared_norms = self.squared_norms
         n_clusters = len(counts)
-        distances = []
         indices_dict = {}
         for i in range(n_clusters):
             indices_dict[i] = [i]
-        for i, j in itertools.product(range(n_clusters), repeat=2):
-            distance = np.inf
-            if i < j:
-                distance = self.d2(counts[i], linear_sums[i], squared_norms[i], counts[j], linear_sums[j], squared_norms[j])
-            distances.append(distance)
-        distances = np.array(distances)
+        counts = counts[:n_clusters]
+        linear_sums = linear_sums[:n_clusters]
+        squared_norms = squared_norms[:n_clusters]
+        cfs = np.column_stack((counts, squared_norms, linear_sums))
+        combinations = list(itertools.combinations(range(n_clusters), 2))
+        distances = dist.pdist(cfs, lambda u, v: np.sqrt(u[1]/u[0] + v[1]/v[0] - 2*np.dot(u[2:], v[2:])/u[0]/v[0]))
         n_global_clusters = n_clusters
         while n_global_clusters > self._n_global_clusters:
             min_index = np.argmin(distances)
-            min_i, min_j = min_index/n_clusters, min_index%n_clusters
-            distances[min_index] = np.inf
+            min_i, min_j = combinations[min_index]
             indices_dict[min_i] += indices_dict[min_j]
             del indices_dict[min_j]
             j_indices = []
@@ -605,7 +600,8 @@ class BirchNode:
         for cf1 in cfs:
             j = i + 1
             for cf2 in cfs[j:]:
-                distances[(i, j)] = self.birch.cluster_distance(cf1.count, cf1.linear_sum, cf1.squared_norm, cf2.count, cf2.linear_sum, cf2.squared_norm)
+                distances[(i, j)] = self.birch.cluster_distance(cf1.count, cf1.linear_sum, cf1.squared_norm,
+                                                                cf2.count, cf2.linear_sum, cf2.squared_norm)
                 j += 1
             i += 1
         seeds_indices = min(distances.iteritems(), key=operator.itemgetter(1))[0]
@@ -778,11 +774,15 @@ class IncrementalDimensionalityReduction:
         pass
 
     @abstractmethod
-    def transform_time_series(self):
+    def transform_one_time_series(self):
         pass
 
     @abstractmethod
-    def add_transform_time_series(self):
+    def transform_many_time_series(self):
+        pass
+
+    @abstractmethod
+    def fit(self):
         pass
 
 
@@ -793,6 +793,11 @@ class IncrementalPCA(IncrementalDimensionalityReduction):
         self.cov = None
         self._W = None
         self.data_ids = []
+        self._to_add_ids = []
+        self._to_add_matrix = None
+        self._transform_buffer_ids = []
+        self._transform_buffer_matrix = None
+        self._transform_buffer_catalogs = []
 
     def standarize(self, x):
         return np.nan_to_num((x - self.mean)/self.std)
@@ -808,7 +813,6 @@ class IncrementalPCA(IncrementalDimensionalityReduction):
         b = mean.T*mean
         xtx_ = n*np.multiply(a,cov)
         return xtx_ + n*b
-
 
     @staticmethod
     def cov_stack(x2, x1_mean, x1_cov, x1_std, n1):
@@ -874,23 +878,6 @@ class IncrementalPCA(IncrementalDimensionalityReduction):
             #     print(self.cov)
             n = self.n + len(x)
 
-    def _extract_feature_matrix(self, time_series_list, only_absents):
-        added_ids = []
-        added_feature_vectors = []
-        added_time_series = []
-        feature_matrix = None
-        for time_series in time_series_list:
-            id_ = time_series.id
-            feature_vector = time_series.feature_vector
-            if only_absents and id_ in self.data_ids:
-                continue
-            if len(feature_vector) != 0:
-                added_time_series.append(time_series)
-                added_ids.append(id_)
-                added_feature_vectors.append(feature_vector)
-        if len(added_feature_vectors) != 0:
-            feature_matrix = np.matrix(np.vstack(added_feature_vectors))
-        return added_time_series, added_ids, feature_matrix
 
     @staticmethod
     def _update_time_series(time_series_list, reduced_matrix):
@@ -899,23 +886,74 @@ class IncrementalPCA(IncrementalDimensionalityReduction):
         for reduced_vector, time_series in zip(reduced_matrix, time_series_list):
             time_series.set_reduced(np.array(reduced_vector).flatten())
 
+    def add_one_time_series(self, time_series):
+        feature_vector = time_series.feature_vector
+        id_ = time_series.id
+        if id_ not in self.data_ids and feature_vector is not None and len(feature_vector) != 0:
+            if self._to_add_matrix is None:
+                self._to_add_matrix = np.array(feature_vector)
+            else:
+                self._to_add_matrix = np.vstack((self._to_add_matrix, feature_vector))
+            self._to_add_ids.append(id_)
+            return True
+        return False
+
     def add_many_time_series(self, time_series_list):
-        added_time_series, ids, feature_matrix = self._extract_feature_matrix(time_series_list, True)
+        i = 0
+        n_added = 0
+        for time_series in time_series_list:
+            if self.add_one_time_series(time_series):
+                n_added += 1
+            if i % 10000 == 0 and i > 0:
+                print("{0} time series addded to IPCA... ".format(i))
+            i += 1
+        return n_added
+
+    def fit(self):
+        feature_matrix = self._to_add_matrix
+        ids = self._to_add_ids
         if feature_matrix is not None:
             self._add_data_matrix(feature_matrix, ids)
+        self._to_add_ids = []
+        self._to_add_matrix = None
         return len(ids)
 
-    def transform_time_series(self, time_series_list):    
-        added_time_series, ids, feature_matrix = self._extract_feature_matrix(time_series_list, False)
-        if feature_matrix is not None:
-            reduced_matrix = self._transform_data_matrix(feature_matrix)
-            IncrementalPCA._update_time_series(added_time_series, reduced_matrix)
-        return len(ids)
+    def transform_one_time_series(self, time_series):
+        feature_matrix = np.matrix(time_series.feature_vector)
+        reduced_matrix = self._transform_data_matrix(feature_matrix)
+        time_series.set_reduced(np.array(reduced_matrix).flatten().tolist())
 
-    def add_transform_time_series(self, time_series_list):
-        added_time_series, ids, feature_matrix = self._extract_feature_matrix(time_series_list, True)
-        if feature_matrix is not None:
-            self._add_data_matrix(feature_matrix, ids)
-            reduced_matrix = self._transform_data_matrix(feature_matrix)
-            IncrementalPCA._update_time_series(added_time_series, reduced_matrix)
-        return len(ids)
+    def transform_many_time_series(self, time_series_sequence):
+        i = 0
+        for time_series in time_series_sequence:
+            self._add_to_transform_buffer(time_series)
+            if i % 10000 == 0 and i > 0:
+                print("{0} time series added to IPCA transform buffer...")
+            i += 1
+        return self.flush_transform_buffer()
+
+    def _add_to_transform_buffer(self, time_series):
+        feature_vector = time_series.feature_vector
+        id_ = time_series.id
+        if id_ not in self._transform_buffer_ids and feature_vector is not None and len(feature_vector) != 0:
+            if self._transform_buffer_matrix is None:
+                self._transform_buffer_matrix = np.array(feature_vector)
+            else:
+                self._transform_buffer_matrix = np.vstack((self._transform_buffer_matrix, feature_vector))
+            self._transform_buffer_ids.append(id_)
+            self._transform_buffer_catalogs.append(time_series.catalog)
+            return True
+        return False
+
+    def flush_transform_buffer(self):
+        print("IPCA calculating time series..."),
+        reduced_matrix = self._transform_data_matrix(self._transform_buffer_matrix)
+        print("DONE")
+        ids = self._transform_buffer_ids
+        catalogs = self._transform_buffer_catalogs
+        self._transform_buffer_matrix = None
+        self._transform_buffer_ids = []
+        self._transform_buffer_catalogs = []
+        return (DataMultibandTimeSeries(None, None, None, None, id_, None, reduced_vector, None, {'catalog': catalog})
+                for id_, catalog, reduced_vector in itertools.izip(ids, catalogs, reduced_matrix))
+

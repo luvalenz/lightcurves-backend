@@ -3,11 +3,83 @@
           [
             {
               "type": "birch",
-              "parameters": [2, true, true, 15]
+              "parameters": [1, false]
             },
             {
               "type": "birch",
-              "parameters": [2.5, true, true, 4]
+              "parameters": [2, false]
+            },
+            {
+              "type": "birch",
+              "parameters": [3, false]
+            },
+            {
+              "type": "birch",
+              "parameters": [4, false]
+            },
+            {
+              "type": "birch",
+              "parameters": [5, false]
+            },
+            {
+              "type": "birch",
+              "parameters": [6, false]
+            },
+            {
+              "type": "birch",
+              "parameters": [7, false]
+            },
+            {
+              "type": "birch",
+              "parameters": [8, false]
+            },
+            {
+              "type": "birch",
+              "parameters": [9, false]
+            },
+            {
+              "type": "birch",
+              "parameters": [10, false]
+            },
+            {
+              "type": "birch",
+              "parameters": [0.1, false]
+            },
+            {
+              "type": "birch",
+              "parameters": [0.2, false]
+            },
+            {
+              "type": "birch",
+              "parameters": [0.3, false]
+            },
+            {
+              "type": "birch",
+              "parameters": [0.4, false]
+            },
+            {
+              "type": "birch",
+              "parameters": [0.5, false]
+            },
+            {
+              "type": "birch",
+              "parameters": [0.6, false]
+            },
+            {
+              "type": "birch",
+              "parameters": [0.7, false]
+            },
+            {
+              "type": "birch",
+              "parameters": [0.8, false]
+            },
+            {
+              "type": "birch",
+              "parameters": [0.9, false]
+            },
+            {
+              "type": "birch",
+              "parameters": [1, true, 10000]
             }
           ],
   "reduction_algorithms":
@@ -40,11 +112,11 @@
           [
             {
               "type": "mongodb",
-              "parameters": ["clusters", "localhost", 27017]
+              "parameters": ["clusters_t1", "localhost", 27017]
             },
             {
               "type": "mongodb",
-              "parameters": ["clusters_testing", "localhost", 27017]
+              "parameters": ["clusters_t1_c10000", "localhost", 27017]
             }
 
           ],
@@ -52,11 +124,87 @@
           [
             {
               "type": "mongodb",
-              "parameters": ["serializations", "localhost", 27017]
+              "parameters": ["serializations_f1_t1", "localhost", 27017]
             },
             {
               "type": "mongodb",
-              "parameters": ["serializations_testing", "localhost", 27017]
+              "parameters": ["serializations_f1_t2", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["serializations_f1_t3", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["serializations_f1_t4", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["serializations_f1_t5", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["serializations_f1_t6", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["serializations_f1_t7", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["serializations_f1_t8", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["serializations_f1_t9", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["serializations_f1_t10", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["serializations_f1_t0_1", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["serializations_f1_t0_2", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["serializations_f1_t0_3", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["serializations_f1_t0_4", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["serializations_f1_t0_5", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["serializations_f1_t0_6", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["serializations_f1_t0_7", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["serializations_f1_t0_8", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["serializations_f1_t0_9", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["serializations_f1_t1_c10000", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["serializations", "localhost", 27017]
             }
           ]
  }
