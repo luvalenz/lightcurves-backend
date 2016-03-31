@@ -12,7 +12,7 @@ class OnlineInterface(object):
     def __init__(self, data_model_interface):
         clustering_db = data_model_interface.get_clustering_database()
         time_series_db = data_model_interface.get_time_series_database()
-        self._indexing_model = OurMethod(clustering_db, time_series_db)
+        self._indexing_model = OurMethod(clustering_db, time_series_db, True)
         self._reduction_model = data_model_interface.get_reduction_model()
 
     def feature_space_query(self, feature_dict, n_neighbours):
@@ -33,16 +33,21 @@ if __name__ == '__main__':
     config = load_config('/home/lucas/PycharmProjects/lightcurves-backend/backend/config.json')
     data_model_interface = DataModelInterface(config)
     online_interface = OnlineInterface(data_model_interface)
-    ts_target = data_model_interface.get_time_series_database().get_one('macho', 'macho.1.3447.36')
+    ts_target = data_model_interface.get_time_series_database().get_one('macho', 'macho.1.3807.1436')
     # serializations_database = data_model_interface.get_serialization_database(20)
     # print serializations_database.db.name
     # ipca = serializations_database._get_old_clustering_model()
     # for i in range(20):
     #     data_model_interface.get_serialization_database(i).store_reduction_model(ipca)
-    print ts_target.reduced_vector
     feature_dict = ts_target.feature_dict
     plot_time_series(ts_target, 'red')
-    time_series_ranking, distances = online_interface.feature_space_query(feature_dict, 10)
+    time_series_ranking, distances, step1_calc_time, step2_load_data_time, step2_calc_time, \
+        number_of_data_after_filter, number_of_visited_clusters = online_interface.feature_space_query(feature_dict, 20)
+    print step1_calc_time
+    print step2_load_data_time
+    print step2_calc_time
+    print number_of_data_after_filter
+    print number_of_visited_clusters
     for ts, distance in zip(time_series_ranking, distances):
         plot_time_series(ts)
 

@@ -2,13 +2,9 @@ __author__ = 'lucas'
 
 import numpy as np
 import scipy.spatial.distance as dist
-
+import time
 
 class OurMethod:
-
-    @property
-    def number_of_distance_calculations(self):
-        return self.number_of_step1_distance_calculations + self.number_of_step2_distance_calculations
 
     @property
     def number_of_features(self):
@@ -36,23 +32,24 @@ class OurMethod:
 
     def __init__(self, clusters_db, time_series_db, simulation=False):
         self.simulation = simulation
-        self.similarity_function = OurMethod.euclidean_distance
         self._clusters_db = clusters_db
         self._time_series_db = time_series_db
 
     def time_series_query(self, target, k):
         reduced_vector = target.reduced_vector
-        retrieved_ids, retrieved_distances = self.vector_query(reduced_vector, k)
+        retrieved_ids, retrieved_distances, step1_calc_time, step2_load_data_time, step2_calc_time, \
+            n_data_after_filter, n_visited_clusters = self.vector_query(reduced_vector, k)
         retrieved_time_series = self._time_series_db.get_many(retrieved_ids, None, False, None, True)
+        if self.simulation:
+            return retrieved_time_series, retrieved_distances, step1_calc_time,  \
+                step2_load_data_time, step2_calc_time, n_data_after_filter, n_visited_clusters
         return retrieved_time_series, retrieved_distances
 
     def vector_query(self, target, k):
-        self.number_of_step1_distance_calculations = 0
-        self.number_of_step2_distance_calculations = 0
-        self.number_of_data_after_filter = 0
+        time0 = time.time()
         distances_target_to_centers = dist.cdist(np.array(np.matrix(target)), self.clusters_centers)[0]
+        time1 = time.time()
         cluster_order_by_distance = np.argsort(distances_target_to_centers)
-        self.number_of_step1_distance_calculations += len(self.clusters_centers)
         tau = 0
         n_searching_data = 0
         searching_clusters_indices = []
@@ -72,49 +69,36 @@ class OurMethod:
         searching_clusters_mask[searching_clusters_indices] = True
         ring_widths = self.clusters_radii + tau - distances_target_to_centers
         overlapping_clusters_mask = ring_widths > 0
-        overlapping_clusters_indices = np.where(np.logical_and(np.logical_not(searching_clusters_mask), overlapping_clusters_mask))[0]
+        overlapping_clusters_indices = \
+            np.where(np.logical_and(np.logical_not(searching_clusters_mask), overlapping_clusters_mask))[0]
         searching_clusters_indices += overlapping_clusters_indices.tolist()
-        self.number_of_disk_accesses = len(searching_clusters_indices)
         searching_data = np.empty((0, self.number_of_features))
         searching_data_ids = np.empty((0))
+        time2 = time.time()
         for cluster_index in searching_clusters_indices:
             ring_width = ring_widths[cluster_index]
             cluster = self.get_cluster(cluster_index)
             data, data_ids = cluster.get_ring_of_data(ring_width)
             searching_data = np.vstack((searching_data, data))
             searching_data_ids = np.hstack((searching_data_ids, data_ids))
-        self.number_of_data_after_filter = len(searching_data)
-        return self.brute_force_search_vectorized(target, searching_data, searching_data_ids, k)
+        time3 = time.time()
+        result_ids, result_distances = self.brute_force_search_vectorized(target, searching_data, searching_data_ids, k)
+        time4 = time.time()
+        number_of_data_after_filter = len(searching_data)
+        number_of_visited_clusters = len(searching_clusters_indices)
+        step1_calc_time = time1 - time0
+        step2_load_data_time = time3 - time2
+        step2_calc_time = time4 - time3
+        return result_ids, result_distances, step1_calc_time,\
+               step2_load_data_time, step2_calc_time, number_of_data_after_filter, number_of_visited_clusters
 
     def get_cluster(self, index):
         return self._clusters_db.get_cluster(self.clusters_ids[index])
 
     def brute_force_search_vectorized(self, target, candidates, candidates_ids, k):
-        self.number_of_step2_distance_calculations += len(candidates)
-        if not self.simulation:
-            distances = dist.cdist(np.matrix(target), candidates)[0]
-            order = distances.argsort()
-            sorted_distances = distances[order]
-            sorted_ids = candidates_ids[order].tolist()
-            return sorted_ids[:k], sorted_distances[:k]
+        distances = dist.cdist(np.matrix(target), candidates)[0]
+        order = distances.argsort()
+        sorted_distances = distances[order]
+        sorted_ids = candidates_ids[order].tolist()
+        return sorted_ids[:k], sorted_distances[:k]
 
-    def calculate_distance(self, v1, v2, step, number_of_operations=None, **kwargs):
-        if number_of_operations is None:
-            number_of_distance_calculations = 1
-        else:
-            number_of_distance_calculations = number_of_operations
-        if step == 1:
-            self.number_of_step1_distance_calculations += number_of_operations
-        elif step == 2:
-            self.number_of_step2_distance_calculations += number_of_operations
-        axis = None
-        if 'axis' in kwargs:
-            axis = kwargs['axis']
-        return self.similarity_function(v1,v2, axis)
-
-    @staticmethod
-    def euclidean_distance(v1, v2, axis = None):
-        if axis is None:
-            return np.linalg.norn(v2-v1)
-        else:
-            return np.linalg.norm(v2 - v1, axis=axis)

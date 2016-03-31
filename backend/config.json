@@ -98,13 +98,13 @@
             { "type": "macho",
               "parameters":
               [
-               "/media/lucas/115d830f-0d51-49ad-8a2f-84544fbab639/MACHO_LMC",
-                "/media/lucas/115d830f-0d51-49ad-8a2f-84544fbab639/MACHO_features_Harmonics"
+               "/home/lucas/MACHO/MACHO_LMC",
+                "/home/lucas/MACHO/MACHO_features_Harmonics"
               ]
             },
             {
               "type": "mongodb",
-              "parameters": [30000, "lightcurves_testing", "localhost", 27017]
+              "parameters": [30000, "lightcurves2", "localhost", 27017]
             }
 
           ],
@@ -116,7 +116,39 @@
             },
             {
               "type": "mongodb",
-              "parameters": ["clusters_t1_c10000", "localhost", 27017]
+              "parameters": ["clusters_t2", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["clusters_t3", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["clusters_t4", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["clusters_t5", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["clusters_t6", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["clusters_t7", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["clusters_t8", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["clusters_t9", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["clusters_t10", "localhost", 27017]
             }
 
           ],

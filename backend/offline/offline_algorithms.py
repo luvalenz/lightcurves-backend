@@ -27,6 +27,10 @@ class IncrementalClustering:
     def count(self):
         pass
 
+    @abstractproperty
+    def metadata(self):
+        pass
+
     @abstractmethod
     def add_one_time_series(self, time_series):
         pass
@@ -83,6 +87,12 @@ class Birch(IncrementalClustering):
         for cf in cfs:
             result += cf.count
         return result
+
+    @property
+    def metadata(self):
+        return {'radius': self.threshold, 'global_clustering': self._global_clustering,
+                'n_global_clusters': self._n_global_clusters,
+                'cluster_distance_measure': self.cluster_distance_measure, 'branching_factor': self.branching_factor}
 
     def add_one_time_series(self, time_series):
         self._locally_labeled_data = None
@@ -293,13 +303,11 @@ class Birch(IncrementalClustering):
         indices_dict = {}
         for i in range(n_clusters):
             indices_dict[i] = [i]
-        counts = counts[:n_clusters]
-        linear_sums = linear_sums[:n_clusters]
-        squared_norms = squared_norms[:n_clusters]
         cfs = np.column_stack((counts, squared_norms, linear_sums))
         combinations = list(itertools.combinations(range(n_clusters), 2))
         distances = dist.pdist(cfs, lambda u, v: np.sqrt(u[1]/u[0] + v[1]/v[0] - 2*np.dot(u[2:], v[2:])/u[0]/v[0]))
         n_global_clusters = n_clusters
+        combination_index = lambda i, j: comb(n_clusters, 2, True)- comb(n_clusters - i, 2, True) + (j-i-1)
         while n_global_clusters > self._n_global_clusters:
             min_index = np.argmin(distances)
             min_i, min_j = combinations[min_index]
@@ -309,13 +317,13 @@ class Birch(IncrementalClustering):
             for k in range(n_clusters):
                 if k != min_i and k != min_j:
                     if k < min_i:
-                        index_i = k*n_clusters + min_i
+                        index_i = combination_index(k, min_i)
                     else:
-                        index_i = min_i*n_clusters + k
+                        index_i = combination_index(min_i, k)
                     if k < min_j:
-                        index_j = k*n_clusters + min_j
+                        index_j = combination_index(k, min_j)
                     else:
-                        index_j = min_j*n_clusters + k
+                        index_j = combination_index(min_j, k)
                     distance_i = distances[index_i]
                     distance_j = distances[index_j]
                     count_i = counts[min_i]

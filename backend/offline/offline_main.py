@@ -76,6 +76,18 @@ def store_f1_t1():
     offline_interface.store_all_clusters()
 
 
+def store_f1_t_8to10():
+    for i in range(7,11):
+        threshold = float(i + 1)
+        print ("### STORING FIELD 1 WITH THRESHOLD {0}".format(threshold))
+        config = load_config('/home/lucas/PycharmProjects/lightcurves-backend/backend/config.json')
+        data_model_interface = DataModelInterface(config)
+        offline_interface = OfflineInterface(data_model_interface, 0, i, i, i, 0)
+        print offline_interface.clustering_model.get_number_of_clusters()
+        print offline_interface.clustering_db._database.name
+        offline_interface.store_all_clusters()
+
+
 def store_f1_t1_c10e4():
     print ("### STORING FIELD 1 WITH THRESHOLD 1.0 and 10000 aglomerative clusters")
     config = load_config('/home/lucas/PycharmProjects/lightcurves-backend/backend/config.json')
@@ -87,6 +99,7 @@ def store_f1_t1_c10e4():
     print offline_interface.clustering_model._n_global_clusters
     print len(offline_interface.clustering_model.get_number_of_clusters())
     offline_interface.store_all_clusters()
+
 
 def calculate_stats():
     config = load_config('/home/lucas/PycharmProjects/lightcurves-backend/backend/config.json')
@@ -151,8 +164,17 @@ def plot_n_clusters_vs_thresholds():
     # plt.plot(domain, c4(domain), color='black')
 
 
+
+
+def transfer_field_1_to_10():
+    config = load_config('/home/lucas/PycharmProjects/lightcurves-backend/backend/config.json')
+    data_model_interface = DataModelInterface(config)
+    offline_interface = OfflineInterface(data_model_interface, 2, 0, 0, 0, 0)
+    offline_interface.transfer_time_series('macho', 1)
+
+
 if __name__ == "__main__":
     start = time.time()
-    store_f1_t1_c10e4()
+    store_f1_t_8to10()
     end = time.time()
     print humanize_time(end-start)

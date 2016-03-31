@@ -14,9 +14,7 @@ else:
 import pymongo
 from pymongo import MongoClient
 import glob
-import pickle
-from bson.binary import Binary
-import itertools
+import random
 
 
 class TimeSeriesDataBase(object):
@@ -40,6 +38,10 @@ class TimeSeriesDataBase(object):
 
     @abstractmethod
     def get_many(self, id_list, original=True, phase=True, features=True, metadata=True):
+        pass
+
+    @abstractmethod
+    def get_many_random(self):
         pass
 
     @abstractmethod
@@ -157,7 +159,8 @@ class MachoFileDataBase(TimeSeriesDataBase):
             features_dict = {}
             if features:
                 features_dict = self.get_features(id_)
-            list_of_dicts.append({'bands': bands_dict, 'features': features_dict, 'metadata': metadata_dict, 'id': 'macho.{0}'.format(id_)})
+            list_of_dicts.append({'bands': bands_dict, 'features': features_dict,
+                                  'metadata': metadata_dict, 'id': 'macho.{0}'.format(id_)})
         return list_of_dicts
 
     def get_all(self, n_fields=82):
@@ -169,6 +172,9 @@ class MachoFileDataBase(TimeSeriesDataBase):
         for dictionary in list_of_dicts:
             list_of_time_series.append(DataMultibandTimeSeries.from_dict(dictionary))
         return list_of_time_series
+
+    def get_many_random(self):
+        pass
 
     @staticmethod
     def _get_metadata_dict(field, tile, seq, file_string):
@@ -287,13 +293,28 @@ class MongoTimeSeriesDataBase(TimeSeriesDataBase):
             cursors.append(cursor)
         return MongoTimeSeriesIterator(cursors, batch, batch_size)
 
-    def get_many(self, id_list, catalog_name=None, batch=True, batch_size=None, sorted=False):
+    def get_many(self, id_list, catalog_name=None, batch=False, batch_size=None, sorted=False, only_reduced=False):
         query = {'id': {'$in': id_list}}
+        if only_reduced:
+            query['reduced'] = {'$ne': None}
         result = self.find_many(catalog_name, query, batch, batch_size)
         if sorted:
             result = list(result)
             result.sort(key=lambda x : id_list.index(x.id))
         return result
+
+    def get_many_random(self, quantity, reduced_not_null=True):
+        catalog = random.choice(self.catalog_names)
+        if reduced_not_null:
+            query = [{'$sample': {'size': 2*quantity}}, {'$match': {'reduced': {'$ne': None}}}]
+        else:
+            query = [{'$sample': {'size': quantity}}]
+        query_result = self.db[catalog].aggregate(query)
+        if reduced_not_null:
+            return (DataMultibandTimeSeries.from_dict(dictionary) for i, dictionary in zip(range(quantity), query_result))
+        else:
+            return (DataMultibandTimeSeries.from_dict(dictionary) for dictionary in query_result)
+
 
     def metadata_search(self, catalog_name, **kwargs):
         query = []
@@ -904,8 +925,8 @@ class MachoTimeSeriesIterator(TimeSeriesIterator):
     def next_batch(self):
         if self._current_tile_index >= len(self._current_field_tiles):
             self._current_tile_index = 0
-            self._current_field_tiles = self._database.get_tiles_in_field(self._current_field)
             self._current_field += 1
+            self._current_field_tiles = self._database.get_tiles_in_field(self._current_field)
         if self._current_field > self._n_fields:
             raise StopIteration
         current_tile = self._current_field_tiles[self._current_tile_index]

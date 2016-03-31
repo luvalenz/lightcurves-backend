@@ -6,7 +6,8 @@ import numpy as np
 import pymongo
 from scipy.spatial.distance import cdist
 import itertools
-
+import gridfs
+import cPickle as pickle
 
 class ClustersDataBase:
     __metaclass__ = ABCMeta
@@ -21,6 +22,18 @@ class ClustersDataBase:
 
     @abstractproperty
     def counts(self):
+        pass
+
+    @abstractproperty
+    def data_points_count(self):
+        pass
+
+    @abstractproperty
+    def clusters_count(self):
+        pass
+
+    @abstractproperty
+    def metadata(self):
         pass
 
     @abstractmethod
@@ -49,10 +62,6 @@ class ClustersDataBase:
 
     @abstractmethod
     def get_count(self, cluster_id):
-        pass
-
-    @abstractmethod
-    def get_cluster_data(self, cluster_id):
         pass
 
     @abstractmethod
@@ -98,6 +107,22 @@ class ClustersMongoDataBase(ClustersDataBase):
             self._load_info()
         return self._counts
 
+    @property
+    def data_points_count(self):
+        if not self._data_points_count:
+            self._load_info()
+        return self._data_points_count
+
+    @property
+    def clusters_count(self):
+        if not self._clusters_count:
+            self._load_info()
+        return self._clusters_count
+
+    @property
+    def metadata(self):
+        return self._database['metadata'].find_one()
+
     def __init__(self, db_name='clusters', url='localhost', port=27017):
         self.client = MongoClient(url, port)
         self.db_name = db_name
@@ -107,20 +132,27 @@ class ClustersMongoDataBase(ClustersDataBase):
     def setup(self):
         pass
 
-    def reset_database(self):
+    def reset_database(self, metadata):
         self.client.drop_database(self.db_name)
         self._database = self.client[self.db_name]
         self._info_loaded = False
         info_collection = self._database['info']
         clusters_collection = self._database['clusters']
+        metadata_collection = self._database['metadata']
         info_collection.create_index([("id", pymongo.ASCENDING)], background=True, unique=True)
         clusters_collection.create_index([("id", pymongo.ASCENDING)], background=True, unique=True)
+        metadata_collection.insert_one(metadata)
 
     def store_cluster(self, index, cluster):
         data_points = cluster.to_list_of_dicts()
         clusters_collection = self._database['clusters']
         clusters_document = {'id': index, 'data': data_points}
-        clusters_collection.insert_one(clusters_document)
+        try:
+            clusters_collection.insert_one(clusters_document)
+        except pymongo.errors.DocumentTooLarge:
+            fs = gridfs.GridFS(self._database)
+            binary_data = pickle.dumps(clusters_document, 2)
+            fs.put(binary_data, filename=str(index))
         info_collection = self._database['info']
         info = cluster.get_info()
         info['id'] = index
@@ -142,6 +174,8 @@ class ClustersMongoDataBase(ClustersDataBase):
         self._radii = np.array(radii)
         self._counts = np.array(counts)
         self._centers = np.array(centers)
+        self._data_points_count = np.sum(self._counts)
+        self._clusters_count = len(ids)
 
     def _get_cluster_info(self, cluster_id):
         info_collection = self._database['info']
@@ -156,11 +190,6 @@ class ClustersMongoDataBase(ClustersDataBase):
     def get_count(self, cluster_id):
         return self._get_cluster_info(cluster_id)['count']
 
-    def get_cluster_data(self, cluster_id):
-        data_point_list_of_dicts = self._database['clusters'].find_one({'id': cluster_id})
-        cluster = Cluster.from_list_of_dicts(data_point_list_of_dicts, None, cluster_id, False)
-        return cluster.data_points
-
     def get_data_ids(self, cluster_id):
         cluster = self._database['clusters'].find(cluster_id)
         ids = []
@@ -170,7 +199,12 @@ class ClustersMongoDataBase(ClustersDataBase):
 
     def get_cluster(self, cluster_id):
         center = self._database['info'].find_one({'id': cluster_id})['center']
-        data_points = self._database['clusters'].find_one({'id': cluster_id})['data']
+        document = self._database['clusters'].find_one({'id': cluster_id})
+        if document is None:
+            fs = gridfs.GridFS(self._database)
+            binary = fs.find_one({"filename": str(cluster_id)}, no_cursor_timeout=True).read()
+            document = pickle.loads(binary)
+        data_points = document['data']
         return Cluster.from_list_of_dicts(data_points, center, cluster_id, False)
 
     def defragment(self):

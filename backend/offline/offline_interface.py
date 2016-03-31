@@ -62,8 +62,7 @@ class OfflineInterface(object):
     def transfer_time_series(self, catalog_name, source_database_index):
         source_db = self._data_model_interface.get_time_series_database(source_database_index)
         destination_db = self.time_series_db
-        batch_iterable = source_db.get_all(1)#todo borrar este 1
-
+        batch_iterable = source_db.get_all(10)#todo borrar este 10
         added_ids = []
         for batch in batch_iterable:
             if len(batch) != 0:
@@ -149,8 +148,8 @@ class OfflineInterface(object):
         self._cluster(batch_iterable)
     
     def store_all_clusters(self):
-        self.clustering_db.reset_database()
         n_clusters = int(self.clustering_model.get_number_of_clusters())
+        self.clustering_db.reset_database(self.clustering_model.metadata)
         print("Storing {0} clusters...".format(n_clusters))
         clusters_iterator = self.clustering_model.get_cluster_iterator(self.time_series_db)
         print("Iterator length: {0}".format(len(clusters_iterator)))

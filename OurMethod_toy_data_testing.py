@@ -94,7 +94,9 @@ clusters = clusters_db.get_all()
 target = [0, 0]
 plot_clusters(clusters)
 our_method = OurMethod(clusters_db, time_series_db)
-ids, distances = our_method.vector_query(target, )
+ids, distances, step1_calc_time,\
+step2_load_data_time, step2_calc_time, \
+number_of_data_after_filter, number_of_visited_clusters= our_method.vector_query(target, )
 print ids
 
 time_series_db = offline_interface.time_series_db
