@@ -290,6 +290,7 @@ class Birch(IncrementalClustering):
         for i, ids in itertools.izip(xrange(len(clusters_data_ids)), clusters_data_ids):
             cluster_labels = np.column_stack((ids, i*np.ones(len(ids))))
             labels.append(cluster_labels)
+
         self._locally_labeled_data = np.vstack(labels)
         self._counts = np.array(counts)
         self._linear_sums = np.vstack(linear_sums)

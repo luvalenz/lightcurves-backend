@@ -41,10 +41,10 @@ if __name__ == '__main__':
     #     data_model_interface.get_serialization_database(i).store_reduction_model(ipca)
     feature_dict = ts_target.feature_dict
     plot_time_series(ts_target, 'red')
-    time_series_ranking, distances, step1_calc_time, step2_load_data_time, step2_calc_time, \
+    time_series_ranking, distances, step1_calc_time, step2_calc_time, \
+        seek_time, transfer_time, \
         number_of_data_after_filter, number_of_visited_clusters = online_interface.feature_space_query(feature_dict, 20)
     print step1_calc_time
-    print step2_load_data_time
     print step2_calc_time
     print number_of_data_after_filter
     print number_of_visited_clusters

@@ -49,11 +49,12 @@ def humanize_time(total_seconds):
 
 
 def cluster_field1():
-    for clustering_model in range(10, 19):
-        print ("### CLUSTERING FIELD 1 WITH THRESHOLD {0} ###".format(clustering_model + 1))
+    for clustering_model in range(13, 19):
+        threshold = float(clustering_model - 9)/10
+        print ("### CLUSTERING FIELD 1 WITH THRESHOLD {0} ###".format(threshold))
         config = load_config('/home/lucas/PycharmProjects/lightcurves-backend/backend/config.json')
         data_model_interface = DataModelInterface(config)
-        offline_interface = OfflineInterface(data_model_interface, 0, 0, clustering_model, clustering_model, 0)
+        offline_interface = OfflineInterface(data_model_interface, 0, clustering_model, clustering_model, clustering_model, 0)
         offline_interface.cluster_all()
 
 
@@ -76,9 +77,9 @@ def store_f1_t1():
     offline_interface.store_all_clusters()
 
 
-def store_f1_t_8to10():
-    for i in range(7,11):
-        threshold = float(i + 1)
+def store_f1_t_0_1_to_0_9():
+    for i in range(10, 19):
+        threshold = float(i - 9)/10
         print ("### STORING FIELD 1 WITH THRESHOLD {0}".format(threshold))
         config = load_config('/home/lucas/PycharmProjects/lightcurves-backend/backend/config.json')
         data_model_interface = DataModelInterface(config)
@@ -175,6 +176,6 @@ def transfer_field_1_to_10():
 
 if __name__ == "__main__":
     start = time.time()
-    store_f1_t_8to10()
+    store_f1_t_0_1_to_0_9()
     end = time.time()
     print humanize_time(end-start)

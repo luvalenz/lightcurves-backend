@@ -37,12 +37,12 @@ class OurMethod:
 
     def time_series_query(self, target, k):
         reduced_vector = target.reduced_vector
-        retrieved_ids, retrieved_distances, step1_calc_time, step2_load_data_time, step2_calc_time, \
-            n_data_after_filter, n_visited_clusters = self.vector_query(reduced_vector, k)
+        retrieved_ids, retrieved_distances, step1_calc_time, step2_calc_time, \
+            seek_time, transfer_time, n_data_after_filter, n_visited_clusters = self.vector_query(reduced_vector, k)
         retrieved_time_series = self._time_series_db.get_many(retrieved_ids, None, False, None, True)
         if self.simulation:
             return retrieved_time_series, retrieved_distances, step1_calc_time,  \
-                step2_load_data_time, step2_calc_time, n_data_after_filter, n_visited_clusters
+                step2_calc_time, seek_time, transfer_time, n_data_after_filter, n_visited_clusters
         return retrieved_time_series, retrieved_distances
 
     def vector_query(self, target, k):
@@ -75,22 +75,35 @@ class OurMethod:
         searching_data = np.empty((0, self.number_of_features))
         searching_data_ids = np.empty((0))
         time2 = time.time()
+        seek_time = 0
+        transfer_time = 0
         for cluster_index in searching_clusters_indices:
             ring_width = ring_widths[cluster_index]
-            cluster = self.get_cluster(cluster_index)
+            time3 = time.time()
+            cursor = self.peek_cluster(cluster_index)
+            time4 = time.time()
+            cluster = self.get_cluster_from_cursor(cursor)
+            time5 = time.time()
+            seek_time += (time4 - time3)
+            transfer_time += (time5 - time4)
             data, data_ids = cluster.get_ring_of_data(ring_width)
             searching_data = np.vstack((searching_data, data))
             searching_data_ids = np.hstack((searching_data_ids, data_ids))
-        time3 = time.time()
+        time6= time.time()
         result_ids, result_distances = self.brute_force_search_vectorized(target, searching_data, searching_data_ids, k)
-        time4 = time.time()
+        time7 = time.time()
         number_of_data_after_filter = len(searching_data)
         number_of_visited_clusters = len(searching_clusters_indices)
         step1_calc_time = time1 - time0
-        step2_load_data_time = time3 - time2
-        step2_calc_time = time4 - time3
+        step2_calc_time = time7 - time6
         return result_ids, result_distances, step1_calc_time,\
-               step2_load_data_time, step2_calc_time, number_of_data_after_filter, number_of_visited_clusters
+               step2_calc_time, seek_time, transfer_time, number_of_data_after_filter, number_of_visited_clusters
+
+    def peek_cluster(self, index):
+        return self._clusters_db.peek_cluster(self.clusters_ids[index])
+
+    def get_cluster_from_cursor(self, cursor):
+        return self._clusters_db.get_cluster_from_cursor(cursor)
 
     def get_cluster(self, index):
         return self._clusters_db.get_cluster(self.clusters_ids[index])

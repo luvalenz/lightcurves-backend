@@ -207,6 +207,24 @@ class ClustersMongoDataBase(ClustersDataBase):
         data_points = document['data']
         return Cluster.from_list_of_dicts(data_points, center, cluster_id, False)
 
+    def peek_cluster(self, cluster_id):
+        cursor = self._database['clusters'].find({'id': cluster_id}).limit(1)
+        if cursor.count() == 0:
+            fs = gridfs.GridFS(self._database)
+            cursor = fs.find({"filename": str(cluster_id)}, no_cursor_timeout=True)
+        return cursor
+
+    def get_cluster_from_cursor(self, cursor):
+        if type(cursor) is gridfs.grid_file.GridOutCursor:
+            binary = cursor.next().read()
+            document = pickle.loads(binary)
+        else:
+            document = cursor.next()
+        cluster_id = document['id']
+        center = self._database['info'].find_one({'id': cluster_id})['center']
+        data_points = document['data']
+        return Cluster.from_list_of_dicts(data_points, center, cluster_id, False)
+
     def defragment(self):
         collection_names = self._database.collection_names()
         collection_names.remove('system.indexes')
@@ -306,7 +324,9 @@ class Cluster:
 
     def get_ring_of_data(self, width):
         ring_indices = np.where(self._distances >= self.radius - width)[0]
-        return self.data_points[ring_indices], self.data_point_ids[ring_indices]
+        return self.data_points, self.data_point_ids
+        #todo restore the rings
+        #return self.data_points[ring_indices], self.data_point_ids[ring_indices]
 
     def get_info(self):
         return {'id': self.id, 'radius': self.radius, 'count': self.count, 'center': list(self.center)}
