@@ -178,11 +178,14 @@ class RegressionData(object):
 
     def _do_clusters_regression(self):
         x = self._simulation_data.birch_radii
+        y = self._simulation_data.n_clusters
         mask = np.where(x < 9)[0]
         x_masked = x[mask]
-        y_rec = np.exp(-1*np.log((self._simulation_data.n_clusters)))
+        y_rec = np.exp(-1*np.log((y)))
+        x_masked = x[mask]
         y_rec_masked = y_rec[mask]
-        self._clusters_polyfit = np.polyfit(x_masked, y_rec_masked, 1)
+        self._clusters_polyfit = np.polyfit(x_masked, y_rec_masked, 2)
+        #self._clusters_polyfit[1] = 0
 
     def _do_transfer_time_regression(self):
         x = self._simulation_data.birch_radii
@@ -335,6 +338,11 @@ class RegressionData(object):
         y_rec = np.poly1d(self._clusters_polyfit)(x)
         return x, y_rec
 
+    def _clusters_regression(self, min=0, max=9, jump=0.1):
+        x = np.arange(min, max + jump, jump)
+        func = lambda x : 25000/x
+        return x, func(x)
+
     def save_pickle(self):
         with open('{0}.pkl'.format(self.name, 'regressions'), 'wb') as f:
             pickle.dump(self, f, protocol=2)
@@ -407,12 +415,11 @@ class RegressionData(object):
         axis_log.set_xlabel('$log(R)$', fontsize=12)
         axis_log.set_ylabel('$log(s)$', fontsize=12)
 
-
     def _plot_number_of_clusters(self, axis_lin, axis_log):
         x, y = self._transfer_time_regression()
         x_data, y_data = self._simulation_data.birch_radii, self._simulation_data.mean_seek_times
         fit = self._transfer_time_polyfit
-        axis_lin.plot(x, y, label='$y={0:.2f} + {1:.2f}x + {2:.2f}x^2$'.format(fit[0], fit[1], fit[2]))
+        axis_lin.plot(x, y, label='$y={0:.2f} + {1:.2f}x + {2:.2f}x^2$'.format(fit[2], fit[1], fit[0]))
         axis_lin.scatter(x_data, y_data)
         axis_lin.legend(loc=4, prop={'size': 15})
         axis_lin.set_title('Total number of clusters ($N_c$)', fontsize=12)
@@ -427,7 +434,7 @@ class RegressionData(object):
     def _plot_transfer_time(self, axis_lin, axis_log):
         x, y = self._transfer_time_regression()
         fit = self._transfer_time_polyfit
-        axis_lin.plot(x, y, label='$y={0:.2f} + {1:.2f}x + {2:.2f}x^2 + {3:.2f}x^3$'.format(fit[0], fit[1], fit[2], fit[3]))
+        axis_lin.plot(x, y, label='$y={0:.2f} + {1:.2f}x + {2:.2f}x^2 + {3:.2f}x^3$'.format(fit[3], fit[2], fit[1], fit[0]))
         axis_lin.scatter(self._simulation_data.birch_radii, self._simulation_data.mean_transfer_times)
         axis_lin.legend(loc=4, prop={'size': 15})
         axis_lin.set_title('Transter Time (TT)', fontsize=12)
@@ -443,7 +450,7 @@ class RegressionData(object):
         x_reg, y_reg = self._step2_time_regression()
         x_sim, y_sim = self._simulation_data.birch_radii, self._simulation_data.mean_step2_times
         fit = self._step2_time_polyfit
-        axis_lin.plot(x_reg, y_reg, label='$y={0:.2f} + {1:.2f}x + {2:.2f}x^2 + {3:.2f}x^3$'.format(fit[0], fit[1], fit[2], fit[3]))
+        axis_lin.plot(x_reg, y_reg, label='$y={0:.2f} + {1:.2f}x + {2:.2f}x^2 + {3:.2f}x^3$'.format(fit[3], fit[2], fit[1], fit[0]))
         axis_lin.scatter(x_sim, y_sim)
         axis_lin.legend(loc=4, prop={'size': 15})
         axis_lin.set_title('Step 2 operation time (S2)', fontsize=12)
@@ -459,7 +466,7 @@ class RegressionData(object):
         x_reg, y_reg = self._total_time_regression()
         x_sim, y_sim = self._simulation_data.birch_radii, self._simulation_data.mean_step2_times
         fit = self._step2_time_polyfit
-        axis_lin.plot(x_reg, y_reg, label='$T = ST + TT + S2$'.format(fit[0], fit[1], fit[2], fit[3]))
+        axis_lin.plot(x_reg, y_reg, label='$T = ST + TT + S2$')
         axis_lin.scatter(x_sim, y_sim)
         axis_lin.legend(loc=4, prop={'size': 15})
         axis_lin.set_title('Total Time (T)', fontsize=12)
@@ -473,7 +480,9 @@ class RegressionData(object):
 
     def _plot_clusters(self, axis_lin, axis_rec):
         x_reg, y_reg_rec = self._reciprocal_clusters_regression()
-        y_reg = np.exp(-1 * np.log(y_reg_rec))
+        x_reg, y_reg = self._clusters_regression()
+        print y_reg_rec
+        print y_reg
         x_data, y_data = self._simulation_data.birch_radii, self._simulation_data.n_clusters
         y_data_rec = np.exp(-1*np.log(y_data))
         mask = np.where(x_data < 9)[0]
@@ -482,17 +491,17 @@ class RegressionData(object):
         fit = self._clusters_polyfit
         print fit
         axis_lin.plot(x_reg, y_reg,
-                 label='$y = \\frac{{1}}{{ {0:.3} + {1:.3}x + {2:.3}x^2 }}$'.format(fit[0], fit[1], 0.0))
+                 label='$y = \\frac{{25000}}{{x}}$')
         axis_lin.scatter(x_data, y_data)
         axis_lin.legend(prop={'size': 15})
         axis_lin.set_title('# clusters($N_C$)', fontsize=12)
         axis_lin.set_xlabel('$R$', fontsize=12)
         axis_lin.set_ylabel('$N_C$', fontsize=12)
         axis_rec.plot(x_reg, y_reg_rec,
-                 label='$y =  {0:.3} + {1:.3}x + {2:.3}x^2$'.format(fit[0], fit[1], 0.0))
+                 label='$y =  {0:.3} + {1:.3}x'.format(fit[1], fit[0]))
         axis_rec.scatter(x_data_masked, y_data_rec_masked)
         axis_rec.legend(prop={'size': 15}, loc=3)
-        axis_rec.set_title('# clusters after first pass ($N_C$)', fontsize=12)
+        axis_rec.set_title('# clusters ($N_C$)', fontsize=12)
         axis_rec.set_xlabel('$R$', fontsize=12)
         axis_rec.set_ylabel('$\\frac{1}{N_C}$', fontsize=12)
 
@@ -502,10 +511,10 @@ class RegressionData(object):
         log_x_reg, log_y_reg = self._log_clusters_after_filter_regression()
         log_x_data, log_y_data = np.log(x_data), np.log(y_data)
         log_fit = self._log_clusters_after_filter_polyfit
-        coefficient = np.exp(log_fit[0])
+        coefficient = np.exp(log_fit[2])
         exponent = log_fit[1]
-        sign = '-' if log_fit[2] < 0 else ''
-        exponent_2 = np.sqrt(np.abs(log_fit[2]))
+        sign = '-' if log_fit[0] < 0 else ''
+        exponent_2 = np.sqrt(np.abs(log_fit[0]))
         axis_lin.plot(x_reg, y_reg,
                  label='$y = {0:.2f}x^{{{1:.2f}}}e^{{ {2}\log^2(x^{{{3:.2f}}})}}$'.format(coefficient, exponent, sign, exponent_2))
         axis_lin.scatter(x_data, y_data)
@@ -514,36 +523,12 @@ class RegressionData(object):
         axis_lin.set_xlabel('$R$', fontsize=12)
         axis_lin.set_ylabel('$\hat{N_C}$', fontsize=12)
         axis_log.plot(log_x_reg, log_y_reg,
-                 label='$y={0:.2f} + {1:.2f}x + {2:.2f}x^2$'.format(log_fit[0], log_fit[1], log_fit[2]))
+                 label='$y={0:.2f} + {1:.2f}x + {2:.2f}x^2$'.format(log_fit[2], log_fit[1], log_fit[0]))
         axis_log.scatter(log_x_data, log_y_data)
         axis_log.legend(prop={'size': 15}, loc=3)
         axis_log.set_title('# clusters after first pass ($\hat{N_C}$)', fontsize=12)
         axis_log.set_xlabel('$log(R)$', fontsize=12)
         axis_log.set_ylabel('$log(\hat{N_C})$', fontsize=12)
-
-    # def _plot_seek_time_per_ts(self, axis_lin, axis_log):
-    #     x_reg, y_reg = self._clusters_after_filter_regression()
-    #     x_data, y_data = self._simulation_data.birch_radii, self._simulation_data.mean_seek_times / self._simulation_data.mean_clusters_after_filter
-    #     log_x_reg, log_y_reg = self._log_clusters_after_filter_regression()
-    #     log_x_data, log_y_data = np.log(x_data), np.log(y_data)
-    #
-    #
-    #
-    #     x_reg, y_reg = self._log_seek_time_per_ts_regression()
-    #     axis_lin.plot(np.exp(x), np.exp(y),
-    #              label='$\\tau_s = \\frac{ST}{\hat{N_C}}$')
-    #     axis_lin.scatter(x_data, y_data)
-    #     axis_lin.legend(prop= {'size': 8})
-    #     axis_lin.set_title('Seek time per light curve ($\\tau_s$)', fontsize=12)
-    #     axis_lin.set_xlabel(' $R$', fontsize=12)
-    #     axis_lin.set_ylabel('$\\tau_s$', fontsize=12)
-    #     axis_log.plot(x, y,
-    #              label='$log(\\tau_s) = log(ST) - log(\hat{N_C})$')
-    #     axis_log.scatter(log_x_data), log_y_data))
-    #     axis_log.legend(prop={'size': 15})
-    #     axis_log.set_title('Seek time per light curve ($\\tau_s$)', fontsize=12)
-    #     axis_log.set_xlabel('$log(R)$', fontsize=12)
-    #     axis_log.set_ylabel('$log(s)$', fontsize=12)
 
     def _plot_avg_data_points_per_cluster(self, axis_lin, axis_log):
         log_x_reg, log_y_reg = self._log_avg_data_points_per_cluster_regression()
@@ -558,7 +543,7 @@ class RegressionData(object):
         axis_lin.plot(x_reg, y_reg,
                  label='$\\mathbf{{n: }} y = {0:.2f}x^{{{1:.2f}}}$'.format(self._avg_data_points_per_cluster_coefficient, self._avg_data_points_per_cluster_exponent))
         axis_lin.plot(x_reg_2, y_reg_2,
-                label='$y={0:.2f} + {1:.2f}x + {2:.2f}x^2$'.format(fit[0], fit[1], fit[2]))
+                label='$y={0:.5f} + {1:.5f}x + {2:.5f}x^2$'.format(fit[2], fit[1], fit[0]))
         axis_lin.scatter(x_data, y_data)
         axis_lin.legend(prop={'size': 15})
         axis_lin.set_title('# light curves per cluster:\n before first pass ($n$), after first pass ($\hat{n}$)', fontsize=12)
