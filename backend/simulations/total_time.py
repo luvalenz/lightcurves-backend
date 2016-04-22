@@ -81,7 +81,7 @@ class ExecutionTimes(object):
 
 if __name__ == '__main__':
     cpu_speed = 2000 # MB/s
-    seek_time_per_cluster = 0.000015 #seconds
+    seek_time_per_cluster = 0.0000015 #seconds
     transfer_rate = 250 # MB/s
     light_curve_size = 5
     gpu_speed = 1

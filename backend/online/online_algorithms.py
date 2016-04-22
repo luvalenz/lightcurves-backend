@@ -38,17 +38,17 @@ class OurMethod:
     def time_series_query(self, target, k):
         reduced_vector = target.reduced_vector
         retrieved_ids, retrieved_distances, step1_calc_time, step2_calc_time, \
-            seek_time, transfer_time, n_data_after_filter, n_visited_clusters = self.vector_query(reduced_vector, k)
+            fetch_time, n_data_after_filter, n_visited_clusters = self.vector_query(reduced_vector, k)
         retrieved_time_series = self._time_series_db.get_many(retrieved_ids, None, False, None, True)
         if self.simulation:
             return retrieved_time_series, retrieved_distances, step1_calc_time,  \
-                step2_calc_time, seek_time, transfer_time, n_data_after_filter, n_visited_clusters
+                step2_calc_time, fetch_time, n_data_after_filter, n_visited_clusters
         return retrieved_time_series, retrieved_distances
 
     def vector_query(self, target, k):
+        clusters_centers = self.clusters_centers
         time0 = time.time()
-        distances_target_to_centers = dist.cdist(np.array(np.matrix(target)), self.clusters_centers)[0]
-        time1 = time.time()
+        distances_target_to_centers = dist.cdist(np.array(np.matrix(target)), clusters_centers)[0]
         cluster_order_by_distance = np.argsort(distances_target_to_centers)
         tau = 0
         n_searching_data = 0
@@ -74,30 +74,23 @@ class OurMethod:
         searching_clusters_indices += overlapping_clusters_indices.tolist()
         searching_data = np.empty((0, self.number_of_features))
         searching_data_ids = np.empty((0))
-        time2 = time.time()
-        seek_time = 0
-        transfer_time = 0
+        time1 = time.time()
         for cluster_index in searching_clusters_indices:
             ring_width = ring_widths[cluster_index]
-            time3 = time.time()
-            cursor = self.peek_cluster(cluster_index)
-            time4 = time.time()
-            cluster = self.get_cluster_from_cursor(cursor)
-            time5 = time.time()
-            seek_time += (time4 - time3)
-            transfer_time += (time5 - time4)
+            cluster = self.get_cluster(cluster_index)
             data, data_ids = cluster.get_ring_of_data(ring_width)
             searching_data = np.vstack((searching_data, data))
             searching_data_ids = np.hstack((searching_data_ids, data_ids))
-        time6= time.time()
+        time2 = time.time()
         result_ids, result_distances = self.brute_force_search_vectorized(target, searching_data, searching_data_ids, k)
-        time7 = time.time()
+        time3 = time.time()
         number_of_data_after_filter = len(searching_data)
         number_of_visited_clusters = len(searching_clusters_indices)
         step1_calc_time = time1 - time0
-        step2_calc_time = time7 - time6
+        fetching_time = time2 - time1
+        step2_calc_time = time3 - time2
         return result_ids, result_distances, step1_calc_time,\
-               step2_calc_time, seek_time, transfer_time, number_of_data_after_filter, number_of_visited_clusters
+               step2_calc_time, fetching_time, number_of_data_after_filter, number_of_visited_clusters
 
     def peek_cluster(self, index):
         return self._clusters_db.peek_cluster(self.clusters_ids[index])
