@@ -66,11 +66,11 @@ class ExecutionTimes(object):
         step2 = self.step2_time(x)
         total = step1 + seek + transfer + step2
         f, ax = plt.subplots(1)
-        ax.plot(x, step1, label='step 1')
-        ax.plot(x, seek, label='seek')
-        ax.plot(x, transfer, label='transfer')
-        ax.plot(x, step2, label='step 2')
-        ax.plot(x, total, label='total')
+        ax.plot(np.log(x), step1, label='step 1')
+        ax.plot(np.log(x), seek, label='seek')
+        ax.plot(np.log(x), transfer, label='transfer')
+        ax.plot(np.log(x), step2, label='step 2')
+        ax.plot(np.log(x), total, label='total')
         ax.legend(prop={'size': 15})
         ax.set_title('Execution times', fontsize=12)
         ax.set_xlabel('$R$', fontsize=12)
@@ -81,7 +81,7 @@ class ExecutionTimes(object):
 
 if __name__ == '__main__':
     cpu_speed = 2000 # MB/s
-    seek_time_per_cluster = 0.0000015 #seconds
+    seek_time_per_cluster = 0.000015 #seconds
     transfer_rate = 250 # MB/s
     light_curve_size = 5
     gpu_speed = 1

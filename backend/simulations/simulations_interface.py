@@ -125,8 +125,10 @@ class RegressionData(object):
         self._avg_data_points_per_cluster_polyfit_2 = None
         self._clusters_polyfit = None
         self._log_fetched_data_polyfit = None
-
         self._avg_fetched_data_small_radii_slope = None
+
+        self.step1_vs_n_clusters_polyfit = None
+        self.step2_vs_fetched_data_polyfit = None
 
 
         self._do_all_regressions()
@@ -169,6 +171,21 @@ class RegressionData(object):
         self._do_log_fetched_data_regression()
         self._do_step2_time_regression()
         self._do_clusters_after_filter_regression_2()
+        self._do_step1_vs_n_clusters_regression()
+        self._do_step2_vs_fetched_data_regression()
+
+    def _do_step1_vs_n_clusters_regression(self):
+        x = self._simulation_data.n_clusters
+        y = self._simulation_data.mean_step1_times
+        self.step1_vs_n_clusters_polyfit = np.polyfit(x, y, 2)
+
+    def _do_step2_vs_fetched_data_regression(self):
+        x = self._simulation_data.avg_fetched_data_points
+        y = self._simulation_data.mean_step2_times
+        self.step2_vs_fetched_data_polyfit = np.polyfit(x, y, 2)
+
+    def _do_step2_vs_fetched_data_regression(self):
+        pass
 
     def _do_seek_time_regression(self):
         birch_radii = self._simulation_data.birch_radii
@@ -265,6 +282,17 @@ class RegressionData(object):
         y = np.poly1d(self._step2_time_polyfit)(x)
         return x, y
 
+    def _step1_vs_n_clusters_regression(self):
+        x = self._simulation_data.n_clusters
+        y = np.poly1d(self.step1_vs_n_clusters_polyfit)(x)
+        return x, y
+
+    def _step2_vs_fetched_data_regression(self):
+        x = self._simulation_data.avg_fetched_data_points
+        y = np.poly1d(self.step2_vs_fetched_data_polyfit)(x)
+        return x, y
+
+
     def _total_time_regression(self, min=0, max=9, jump=0.1):
         x = np.arange(min, max + jump, jump)
         x_st, y_st = np.exp(self._log_seek_time_regression(min, max, jump))
@@ -334,7 +362,8 @@ class RegressionData(object):
                 os.makedirs(self.name)
         f_a, ((a0, a1), (a2, a3)) = plt.subplots(2, 2)
         f_b, ((b0, b1), (b2, b3)) = plt.subplots(2, 2)
-        # self._plot_seek_time(a1, b1)
+        f_c, ((c0, c1, c2), (c3, c4, c5), (c6, c7, c8)) = plt.subplots(3,3)
+        self._plot_step1_time(c0, c1)
         # self._plot_transfer_time(a2, b2)
         # self._plot_step2_time(a3, b3)
 #        self._plot_seek_time_per_ts(a5, b5)
@@ -352,8 +381,12 @@ class RegressionData(object):
         f_b.suptitle("Simulation {0}\ntargets: {1},   data points: {2}\n"
                    "Regressions in log-log space".format(self._simulation_data.name, self._simulation_data.n_targets,
                                 self._simulation_data._data_points_count), fontsize=16)
+        f_c.suptitle("Simulation {0}\ntargets: {1},   data points: {2}\n"
+                   "Regressions".format(self._simulation_data.name, self._simulation_data.n_targets,
+                                self._simulation_data._data_points_count), fontsize=16)
         f_a.set_size_inches(18.5, 10.5)
         f_b.set_size_inches(18.5, 10.5)
+        f_c.set_size_inches(18.5, 10.5)
         if save:
             plt.figure(f_a.number)
             plt.tight_layout()
@@ -363,52 +396,22 @@ class RegressionData(object):
             plt.tight_layout()
             plt.subplots_adjust(top=0.85)
             plt.savefig(os.path.join(self.name, 'regressions modified space.jpg'))
+            plt.figure(f_c.number)
+            plt.tight_layout()
+            plt.subplots_adjust(top=0.85)
+            plt.savefig(os.path.join(self.name, 'regressions execution times.jpg'))
         else:
             plt.figure(f_a.number)
             plt.show()
             plt.figure(f_b.number)
             plt.show()
 
-    # def _plot_seek_time(self, axis_lin, axis_log):
-    #     x_reg, y_reg = self._seek_time_regression()
-    #     x_data, y_data = self._simulation_data.birch_radii, self._simulation_data.mean_seek_times
-    #     log_x_reg, log_y_reg = self._log_seek_time_regression()
-    #     log_x_data, log_y_data = np.log(x_data), np.log(y_data)
-    #     log_fit = self._log_seek_time_polyfit
-    #     coefficient = np.exp(log_fit[0])
-    #     exponent = log_fit[1]
-    #     sign = '-' if log_fit[2] < 0 else ''
-    #     exponent_2 = np.sqrt(np.abs(log_fit[2]))
-    #     axis_lin.plot(x_reg, y_reg,
-    #              label='$y = {0:.2f}x^{{{1:.2f}}}e^{{ {2}\log^2(x^{{{3:.2f}}})}}$'.format(coefficient, exponent, sign, exponent_2))
-    #     axis_lin.scatter(x_data, y_data)
-    #     axis_lin.legend(prop={'size': 15})
-    #     axis_lin.set_title('Seek Time (ST)', fontsize=12)
-    #     axis_lin.set_xlabel('$R$', fontsize=12)
-    #     axis_lin.set_ylabel('$seconds$', fontsize=12)
-    #     axis_log.plot(log_x_reg, log_y_reg,
-    #              label='$y={0:.2f} + {1:.2f}x + {2:.2f}x^2$'.format(log_fit[2], log_fit[1], log_fit[0]))
-    #     axis_log.scatter(log_x_data, log_y_data)
-    #     axis_log.legend(prop={'size': 15})
-    #     axis_log.set_title('Seek time (ST)', fontsize=12)
-    #     axis_log.set_xlabel('$log(R)$', fontsize=12)
-    #     axis_log.set_ylabel('$log(s)$', fontsize=12)
+    def _plot_step1_time(self, axis_r, axis_nc):
 
-    def _plot_number_of_clusters(self, axis_lin, axis_log):
-        x, y = self._transfer_time_regression()
-        x_data, y_data = self._simulation_data.birch_radii, self._simulation_data.mean_seek_times
-        fit = self._transfer_time_polyfit
-        axis_lin.plot(x, y, label='$y={0:.2f} + {1:.2f}x + {2:.2f}x^2$'.format(fit[2], fit[1], fit[0]))
-        axis_lin.scatter(x_data, y_data)
-        axis_lin.legend(loc=4, prop={'size': 15})
-        axis_lin.set_title('Total number of clusters ($N_c$)', fontsize=12)
-        axis_lin.set_xlabel('$R$', fontsize=12)
-        axis_lin.set_ylabel('$# clusters$', fontsize=12)
-        axis_log.scatter(np.log(x_data), np.log(y_data))
-        axis_log.legend(loc=4, prop={'size': 15})
-        axis_log.set_title('Total number of clusters ($N_c$)', fontsize=12)
-        axis_log.set_xlabel('$log(R)$', fontsize=12)
-        axis_log.set_ylabel('$log(# clusters)$', fontsize=12)
+        nc_data, r_data, y_data = self._simulation_data.n_clusters, \
+                                  self._simulation_data.birch_radii, self._simulation_data.mean_step1_times
+        axis_nc.scatter(nc_data, y_data)
+        axis_r.scatter(r_data, y_data)
 
     def _plot_transfer_time(self, axis_lin, axis_log):
         x, y = self._transfer_time_regression()
@@ -595,8 +598,12 @@ class SimulationData(object):
         return np.array([np.mean(seek_times) for seek_times in self._seek_times])
 
     @property
-    def mean_transfer_times(self):
-        return np.array([np.mean(times) for times in self._transfer_times])
+    def mean_fetching_times(self):
+        return np.array([np.mean(times) for times in self._fetching_times])
+
+    @property
+    def mean_step1_times(self):
+        return np.array([np.mean(times) for times in self._step1_calc_times])
 
     @property
     def mean_step2_times(self):
@@ -726,7 +733,6 @@ class SimulationData(object):
 
     def plot_log_seek_time(self, save=False):
         f, (ax0, ax1) = plt.subplots(2)
-
         birch_radii = np.array(self._birch_radii)
         mean_seek_times = [np.mean(seek_times) for seek_times in self._seek_times]
         log_birch_radii = np.log(self._birch_radii)
@@ -782,24 +788,28 @@ class SimulationData(object):
     def plot_times(self, save=False):
         f, ((ax0, ax1), (ax2, ax3)) = plt.subplots(2, 2)
         ax0.boxplot(self._step1_calc_times, positions=self._birch_radii)
+        ax0.plot(self._birch_radii, self.mean_step1_times, 'o', color='green')
         ax0.set_xticks(self._birch_radii)
         ax0.set_xticklabels(self._birch_radii, rotation=45)
         ax0.set_ylabel('Time (seconds)')
         ax0.set_xlabel('Birch radius')
         ax0.set_title('Step 1 calculations')
         ax1.boxplot(self._step2_calc_times, positions=self._birch_radii)
+        ax1.plot(self._birch_radii, self.mean_step2_times, 'o', color='green')
         ax1.set_xticks(self._birch_radii)
         ax1.set_xticklabels(self._birch_radii, rotation=45)
         ax1.set_ylabel('Time (seconds)')
         ax1.set_xlabel('Birch radius')
         ax1.set_title('Step 2 calculations')
         ax2.boxplot(self._fetching_times, positions=self._birch_radii)
+        ax2.plot(self._birch_radii, self.mean_fetching_times, 'o', color='green')
         ax2.set_xticks(self._birch_radii)
         ax2.set_xticklabels(self._birch_radii, rotation=45)
         ax2.set_xlabel('Birch radius')
         ax2.set_ylabel('Time (seconds)')
         ax2.set_title('Fetching time')
         ax3.boxplot(self._total_times, positions=self._birch_radii)
+        ax3.plot(self._birch_radii, self.mean_total_times, 'o', color='green')
         ax3.set_xticks(self._birch_radii)
         ax3.set_xticklabels(self._birch_radii, rotation=45)
         ax3.set_ylabel('Time (seconds)')
