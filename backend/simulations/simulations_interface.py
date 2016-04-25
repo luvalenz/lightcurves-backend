@@ -177,15 +177,12 @@ class RegressionData(object):
     def _do_step1_vs_n_clusters_regression(self):
         x = self._simulation_data.n_clusters
         y = self._simulation_data.mean_step1_times
-        self.step1_vs_n_clusters_polyfit = np.polyfit(x, y, 2)
+        self.step1_vs_n_clusters_polyfit = np.polyfit(x, y, 1)
 
     def _do_step2_vs_fetched_data_regression(self):
         x = self._simulation_data.avg_fetched_data_points
         y = self._simulation_data.mean_step2_times
-        self.step2_vs_fetched_data_polyfit = np.polyfit(x, y, 2)
-
-    def _do_step2_vs_fetched_data_regression(self):
-        pass
+        self.step2_vs_fetched_data_polyfit = np.polyfit(x, y, 1)
 
     def _do_seek_time_regression(self):
         birch_radii = self._simulation_data.birch_radii
@@ -197,7 +194,7 @@ class RegressionData(object):
     def _do_clusters_regression(self):
         x = self._simulation_data.birch_radii
         y = self._simulation_data.n_clusters
-        x_rec = np.exp(-1*np.log((x)))
+        x_rec = np.exp(-1*np.log(x))
         mask = np.where(np.logical_and(x <= 9, x >= 0.2))[0]
         x_rec_masked = x_rec[mask]
         y_masked = y[mask]
@@ -287,11 +284,49 @@ class RegressionData(object):
         y = np.poly1d(self.step1_vs_n_clusters_polyfit)(x)
         return x, y
 
+    def _step1_vs_radius_regression(self, min=0, max=9, jump=0.1):
+        x, x_inv, h = self._n_clusters_regression(min, max, jump)
+        y = self.step1_vs_n_clusters_polyfit[0] * h
+        return x, y
+
     def _step2_vs_fetched_data_regression(self):
         x = self._simulation_data.avg_fetched_data_points
+        min = np.min(x)
+        max = np.max(x)
+        x = np.arange(min, max, (max - min)/100)
         y = np.poly1d(self.step2_vs_fetched_data_polyfit)(x)
         return x, y
 
+    def _step2_vs_radius_regression(self, min=0, max=9, jump=0.1):
+        log_x, log_h = self._log_fetched_data_regression()
+        x, h = np.exp(log_x), np.exp(log_h)
+        y = self.step2_vs_fetched_data_polyfit[0] * h
+        print self.step2_vs_fetched_data_polyfit
+        return x, y
+
+    def _fetching_time_vs_radius_regression(self, min=0, max=9, jump=0.1):
+        x = np.arange(min, max + jump, jump)
+        x1, st = self._seek_time_vs_radius_regression(min, max, jump)
+        x2, tt = self._transfer_time_vs_radius_regression(min, max, jump)
+        y = st + tt
+        return x, y
+
+    def _seek_time_vs_radius_regression(self, min=0, max=9, jump=0.1):
+        x = np.arange(min, max + jump, jump)
+        log_x, log_nc = self._log_clusters_after_filter_regression(min, max, jump)
+        nc = np.exp(log_nc)
+        seek_time_per_cluster = 15.62 * 10**-3
+        return x, nc*seek_time_per_cluster
+
+    def _transfer_time_vs_radius_regression(self, min=0, max=9, jump=0.1):
+        x = np.arange(min, max + jump, jump)
+        log_nl, log_nl = self._log_fetched_data_regression(min, max, jump)
+        nl = np.exp(log_nl)
+        transfer_rate = 91.70 * 10**6
+        data_point_size = 10*8 * 5
+        tt_per_data_point = data_point_size / transfer_rate
+        y = tt_per_data_point*nl
+        return x, y
 
     def _total_time_regression(self, min=0, max=9, jump=0.1):
         x = np.arange(min, max + jump, jump)
@@ -350,6 +385,14 @@ class RegressionData(object):
         y = np.hstack((y1, y2))
         return x, y
 
+    def _n_clusters_regression(self, min=0, max=9, jump=0.1):
+        x = np.arange(min, max + jump, jump)
+        x_rec = np.exp(-1*np.log(x))
+        y = np.poly1d(self._clusters_polyfit)(x_rec)
+        return x, x_rec, y
+
+
+
     def save_pickle(self):
         with open('{0}.pkl'.format(self.name, 'regressions'), 'wb') as f:
             pickle.dump(self, f, protocol=2)
@@ -362,10 +405,10 @@ class RegressionData(object):
                 os.makedirs(self.name)
         f_a, ((a0, a1), (a2, a3)) = plt.subplots(2, 2)
         f_b, ((b0, b1), (b2, b3)) = plt.subplots(2, 2)
-        f_c, ((c0, c1, c2), (c3, c4, c5), (c6, c7, c8)) = plt.subplots(3,3)
-        self._plot_step1_time(c0, c1)
-        # self._plot_transfer_time(a2, b2)
-        # self._plot_step2_time(a3, b3)
+        f_c, ((c0, c1, c2), (c3, c4, c5)) = plt.subplots(2,3)
+        self._plot_step1_time(c0, c3)
+        self._plot_fetching_time(c2)
+        self._plot_step2_time(c1, c4)
 #        self._plot_seek_time_per_ts(a5, b5)
 
         self._plot_clusters(a0, b0)
@@ -406,43 +449,61 @@ class RegressionData(object):
             plt.figure(f_b.number)
             plt.show()
 
-    def _plot_step1_time(self, axis_r, axis_nc):
+    def _plot_step2_time(self, axis_r, axis_nc):
+        nd_data, r_data, y_data = self._simulation_data.avg_fetched_data_points, \
+                                  self._simulation_data.birch_radii, self._simulation_data.mean_step2_times
+        nd_reg, y_nd_reg = self._step2_vs_fetched_data_regression()
+        r_reg, y_r_reg = self._step2_vs_radius_regression()
+        fit = self.step2_vs_fetched_data_polyfit
+        axis_nc.scatter(nd_data, y_data)
+        axis_nc.plot(nd_reg, y_nd_reg, label='$y = {0}x + {1}$'.format(fit[0], fit[1]))
+        axis_nc.legend(loc=4, prop={'size': 15})
+        axis_nc.set_title('Step 2 vs fetched data($S2 vs\\hat{{N_L}}$)', fontsize=12)
+        axis_nc.set_xlabel('$\\hat{{N_L}}$', fontsize=12)
+        axis_nc.set_ylabel('Time $(seconds)$', fontsize=12)
 
+        axis_r.scatter(r_data, y_data)
+        axis_r.plot(r_reg, y_r_reg, label='$y = {0:.2}\\hat{{N_L}}(R)$'.format(fit[0]))
+        axis_r.legend(prop={'size': 15})
+        axis_r.set_title('Step 2 vs radius($S2 vs R$)', fontsize=12)
+        axis_r.set_xlabel('$R$', fontsize=12)
+        axis_r.set_ylabel('Time $(seconds)$', fontsize=12)
+
+    def _plot_fetching_time(self, axis):
+        x_reg, y_reg = self._fetching_time_vs_radius_regression()
+        x_seek, y_seek = self._seek_time_vs_radius_regression()
+        x_transfer, y_transfer = self._transfer_time_vs_radius_regression()
+        x_data, y_data = self._simulation_data.birch_radii, \
+                                self._simulation_data.mean_fetching_times
+        axis.plot(x_seek, y_seek, label='$ST = \\tau_t\\hat{N_c}$')
+        axis.plot(x_transfer, y_transfer, label='$TT = s_t\\hat{N_L}$')
+        axis.plot(x_reg, y_reg, label='$FT = ST + TT$')
+        axis.scatter(x_data, y_data)
+        axis.legend(loc=4, prop={'size': 15})
+        axis.set_title('Fetching Time (FT)', fontsize=12)
+        axis.set_xlabel('$R$', fontsize=12)
+        axis.set_ylabel('Time $(seconds)$', fontsize=12)
+
+    def _plot_step1_time(self, axis_r, axis_nc):
         nc_data, r_data, y_data = self._simulation_data.n_clusters, \
                                   self._simulation_data.birch_radii, self._simulation_data.mean_step1_times
+        nc_reg, y_nc_reg = self._step1_vs_n_clusters_regression()
+        r_reg, y_r_reg = self._step1_vs_radius_regression()
+        fit = self.step1_vs_n_clusters_polyfit
         axis_nc.scatter(nc_data, y_data)
+        axis_nc.plot(nc_reg, y_nc_reg, label='$y = {0}x + {1}$'.format(fit[0], fit[1]))
+        axis_nc.legend(loc=4, prop={'size': 15})
+        axis_nc.set_title('Step 1 vs number of clusters($S1 vs N_c$)', fontsize=12)
+        axis_nc.set_xlabel('$N_c$', fontsize=12)
+        axis_nc.set_ylabel('Time $(seconds)$', fontsize=12)
+
         axis_r.scatter(r_data, y_data)
+        axis_r.plot(r_reg, y_r_reg, label='$y = {0:.2}N_c(R)$'.format(fit[0]))
+        axis_r.legend(prop={'size': 15})
+        axis_r.set_title('Step 1 vs radius($S1 vs R$)', fontsize=12)
+        axis_r.set_xlabel('$R$', fontsize=12)
+        axis_r.set_ylabel('Time $(seconds)$', fontsize=12)
 
-    def _plot_transfer_time(self, axis_lin, axis_log):
-        x, y = self._transfer_time_regression()
-        fit = self._transfer_time_polyfit
-        axis_lin.plot(x, y, label='$y={0:.2f} + {1:.2f}x + {2:.2f}x^2 + {3:.2f}x^3$'.format(fit[3], fit[2], fit[1], fit[0]))
-        axis_lin.scatter(self._simulation_data.birch_radii, self._simulation_data.mean_transfer_times)
-        axis_lin.legend(loc=4, prop={'size': 15})
-        axis_lin.set_title('Transter Time (TT)', fontsize=12)
-        axis_lin.set_xlabel('$R$', fontsize=12)
-        axis_lin.set_ylabel('$seconds$', fontsize=12)
-        axis_log.scatter(np.log(self._simulation_data.birch_radii), np.log(self._simulation_data.mean_transfer_times))
-        axis_log.legend(loc=4, prop={'size': 15})
-        axis_log.set_title('Transter Time (TT)', fontsize=12)
-        axis_log.set_xlabel('$log(R)$', fontsize=12)
-        axis_log.set_ylabel('$log(seconds)$', fontsize=12)
-
-    def _plot_step2_time(self, axis_lin, axis_log):
-        x_reg, y_reg = self._step2_time_regression()
-        x_sim, y_sim = self._simulation_data.birch_radii, self._simulation_data.mean_step2_times
-        fit = self._step2_time_polyfit
-        axis_lin.plot(x_reg, y_reg, label='$y={0:.2f} + {1:.2f}x + {2:.2f}x^2 + {3:.2f}x^3$'.format(fit[3], fit[2], fit[1], fit[0]))
-        axis_lin.scatter(x_sim, y_sim)
-        axis_lin.legend(loc=4, prop={'size': 15})
-        axis_lin.set_title('Step 2 operation time (S2)', fontsize=12)
-        axis_lin.set_xlabel('$R$', fontsize=12)
-        axis_lin.set_ylabel('$seconds$', fontsize=12)
-        axis_log.scatter(np.log(x_sim), np.log(y_sim))
-        axis_log.legend(loc=4, prop={'size': 15})
-        axis_log.set_title('Step 2 operation time (S2)', fontsize=12)
-        axis_log.set_xlabel('$log(R)$', fontsize=12)
-        axis_log.set_ylabel('$log(seconds)$', fontsize=12)
 
     def _plot_total_time(self, axis_lin, axis_log):
         x_reg, y_reg = self._total_time_regression()
@@ -461,30 +522,29 @@ class RegressionData(object):
         axis_log.set_ylabel('$log(seconds)$', fontsize=12)
 
     def _plot_clusters(self, axis_lin, axis_rec):
-
-        x_reg = np.arange(0, 9.1, 0.1)
-        y_reg = np.poly1d(self._clusters_polyfit)(x_reg)
-        x_rec_reg = np.exp(-1*np.log(x_reg))
-        print x_rec_reg
+        x_reg, x_rec_reg, y_reg = self._n_clusters_regression()
         fit = self._clusters_polyfit
-
         x_data, y_data = self._simulation_data.birch_radii, self._simulation_data.n_clusters
         x_data_rec = np.exp(-1*np.log(x_data))
         axis_lin.scatter(x_data, y_data)
+        print x_reg
+        print y_reg
+        axis_lin.plot(x_reg, y_reg)
         axis_lin.legend(prop={'size': 15})
         axis_lin.set_title('# clusters($N_C$)', fontsize=12)
         axis_lin.set_xlabel('$R$', fontsize=12)
         axis_lin.set_ylabel('$N_C$', fontsize=12)
-        axis_lin.plot(x_rec_reg, y_reg,
+        axis_lin.plot(x_reg, y_reg,
                  label='$y = \\frac{{{0:.3}}}{{x^2}} + \\frac{{{1:.3}}}{{x}} + {2:.3}$'.format(fit[0], fit[1], fit[2]))
         axis_lin.legend(prop={'size': 15}, loc=0)
-        axis_rec.plot(x_reg, y_reg,
-                 label='$y = {0:.3}x^2 + {1:.3}x + {2:.3}$'.format(fit[0], fit[1], fit[2]))
+        # axis_rec.plot(x_reg, y_reg,
+        #          label='$y = {0:.3}x^2 + {1:.3}x + {2:.3}$'.format(fit[0], fit[1], fit[2]))
         axis_rec.scatter(x_data_rec, y_data)
+        axis_rec.plot(x_rec_reg, y_reg)
         axis_rec.legend(prop={'size': 15}, loc=0)
         axis_rec.set_title('# clusters ($N_C$)', fontsize=12)
-        axis_rec.set_xlabel('$R$', fontsize=12)
-        axis_rec.set_ylabel('$\\frac{1}{N_C}$', fontsize=12)
+        axis_rec.set_xlabel('$\\frac{1}{R}$', fontsize=12)
+        axis_rec.set_ylabel('$N_C$', fontsize=12)
 
     def _plot_clusters_after_filter(self, axis_lin, axis_log):
         x_reg, y_reg = self._clusters_after_filter_regression()
