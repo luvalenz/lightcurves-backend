@@ -68,7 +68,7 @@ class IncrementalClustering:
 class Birch(IncrementalClustering):
 
     def __init__(self, threshold, global_clustering=True, n_global_clusters=50,
-                 cluster_distance_measure='d0', cluster_size_measure='r', branching_factor=50):
+                 cluster_distance_measure='d0', cluster_size_measure='r', branching_factor=50, clusters_max_size=None):
         self.branching_factor = branching_factor
         self.threshold = threshold
         self.cluster_size_measure = cluster_size_measure
@@ -79,6 +79,7 @@ class Birch(IncrementalClustering):
         self._globally_labeled_data = None
         self._global_clustering = global_clustering
         self._n_global_clusters = n_global_clusters
+        self.clusters_max_size = clusters_max_size
 
     @property
     def count(self):
@@ -700,6 +701,9 @@ class ClusteringFeature:
     def is_empty(self):
         return self.count == 0
 
+    def size(self):
+        return self.birch.cluster_size(self.count, self.linear_sum, self.squared_norm)
+
     @property
     def centroid(self):
         return self.linear_sum / self.count
@@ -765,6 +769,9 @@ class NonLeafClusteringFeature(ClusteringFeature):
         return True
 
     def get_clusters(self):
+        max_size = self.birch.clusters_max_size
+        if max_size is not None and self.size < max_size:
+            return self
         return self.child.get_clusters()
 
     def add(self, index, data_point_cf):

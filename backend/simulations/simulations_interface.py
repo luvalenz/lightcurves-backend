@@ -993,7 +993,6 @@ class BirchMultiDatabaseSimulationsInterface(object):
     def count(self):
         return self._clustering_dbs[0].data_points_count
 
-
     @property
     def radii(self):
         return [clustering_db.metadata['radius'] for clustering_db in self._clustering_dbs]

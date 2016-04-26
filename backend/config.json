@@ -98,13 +98,13 @@
             { "type": "macho",
               "parameters":
               [
-               "/home/lucas/MACHO/MACHO_LMC",
-                "/home/lucas/MACHO/MACHO_features_Harmonics"
+               "/media/lucas/E008ED0808ECDE92/MACHO/MACHO_LMC",
+                "/media/lucas/E008ED0808ECDE92/MACHO/MACHO_features_Harmonics"
               ]
             },
             {
               "type": "mongodb",
-              "parameters": [30000, "lightcurves2", "localhost", 27017]
+              "parameters": [30000, "lightcurves_f_1_3", "localhost", 27017]
             }
 
           ],

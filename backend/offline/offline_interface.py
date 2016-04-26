@@ -62,7 +62,7 @@ class OfflineInterface(object):
     def transfer_time_series(self, catalog_name, source_database_index):
         source_db = self._data_model_interface.get_time_series_database(source_database_index)
         destination_db = self.time_series_db
-        batch_iterable = source_db.get_all(10)#todo borrar este 10
+        batch_iterable = source_db.get_all(3)#todo borrar este 2
         added_ids = []
         for batch in batch_iterable:
             if len(batch) != 0:

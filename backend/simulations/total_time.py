@@ -52,9 +52,7 @@ class ExecutionTimes(object):
     def total_time(self, radius):
         return self.step1_time(radius) + self.seek_time(radius) + self.transfer_time(radius) + self.step2_time(radius)
 
-    def plot(self, min=0, max=9, jump=0.001):
-
-
+    def plot(self, logspace, min=0, max=9, jump=0.001):
         plt.style.use('bmh')
         x = np.arange(min, max, jump)
         step1 = self.step1_time(x)
@@ -62,23 +60,25 @@ class ExecutionTimes(object):
         transfer = self.transfer_time(x)
         step2 = self.step2_time(x)
         total = self.total_time(x)
+        gpu_limit = self.max_number_of_clusters_radius(x)
+        n_clusters = self.n_clusters_function(x)
+        if logspace:
+            x = np.log(x)
         f, (ax1, ax2) = plt.subplots(2, sharex=True)
         f.suptitle('Predicted execution times for {0} lightcurves dataset'.format(self.n_lc))
-        ax1.plot(x, self.n_clusters_function(x))
+        ax1.plot(x, n_clusters)
         ax1.set_title('Number of clusters', fontsize=12)
+        ax2.plot(x, total, label='total', linewidth=4)
         ax2.plot(x, step1, label='step 1')
         ax2.plot(x, seek, label='seek')
         ax2.plot(x, transfer, label='transfer')
         ax2.plot(x, step2, label='step 2')
-        ax2.plot(x, total, label='total')
         ax2.legend(prop={'size': 15})
         ax2.set_title('Execution times', fontsize=12)
         ax2.set_xlabel('$R$', fontsize=12)
         ax2.set_ylabel('$seconds$', fontsize=12)
-        r = self.max_number_of_clusters_radius(x)
-        print r
-        ax1.axvline(x=self.max_number_of_clusters_radius(x))
-        ax2.axvline(x=self.max_number_of_clusters_radius(x))
+        ax1.axvline(x=gpu_limit)
+        ax2.axvline(x=gpu_limit)
         plt.subplots_adjust(top=0.85)
         plt.show()
 
@@ -88,8 +88,6 @@ class ExecutionTimes(object):
         y = self.n_clusters_function(x)
         plt.plot(x, y)
         plt.show()
-
-
 
 if __name__ == '__main__':
     time_per_light_curve_step1 = 1.3e-7
@@ -109,4 +107,4 @@ if __name__ == '__main__':
                            transfer_rate, seek_time, dimensionality, scalar_size, metadata_size,
                            n_clusters_function, n_cluster_after_pass_function,
                            n_lc_after_pass_function, n_lc_per_cluster, number_of_lc, gpu_memory)
-    times.plot()
+    times.plot(True)

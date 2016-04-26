@@ -167,7 +167,7 @@ def plot_n_clusters_vs_thresholds():
 
 
 
-def transfer_field_1_to_10():
+def transfer_field_1_to_2():
     config = load_config('/home/lucas/PycharmProjects/lightcurves-backend/backend/config.json')
     data_model_interface = DataModelInterface(config)
     offline_interface = OfflineInterface(data_model_interface, 2, 0, 0, 0, 0)
@@ -176,6 +176,6 @@ def transfer_field_1_to_10():
 
 if __name__ == "__main__":
     start = time.time()
-    store_f1_t_0_1_to_0_9()
+    transfer_field_1_to_2()
     end = time.time()
     print humanize_time(end-start)
