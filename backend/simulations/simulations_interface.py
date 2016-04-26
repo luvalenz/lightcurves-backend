@@ -320,12 +320,18 @@ class RegressionData(object):
 
     def _transfer_time_vs_radius_regression(self, min=0, max=9, jump=0.1):
         x = np.arange(min, max + jump, jump)
-        log_nl, log_nl = self._log_fetched_data_regression(min, max, jump)
+        x1, log_nl = self._log_fetched_data_regression(min, max, jump)
+        x2, log_nc = self._log_clusters_after_filter_regression(min, max, jump)
+        nc = np.exp(log_nc)
         nl = np.exp(log_nl)
         transfer_rate = 91.70 * 10**6
-        data_point_size = 10*8 * 5
-        tt_per_data_point = data_point_size / transfer_rate
-        y = tt_per_data_point*nl
+        dimensionality = 5
+        scalar_size = 24
+        metadata_size_per_cluster = 160
+        data_point_size = dimensionality*scalar_size
+        total_data_points_size = data_point_size*nl
+        total_metadata_size = metadata_size_per_cluster*nc
+        y = (total_data_points_size + total_metadata_size)/transfer_rate
         return x, y
 
     def _total_time_regression(self, min=0, max=9, jump=0.1):
@@ -475,8 +481,8 @@ class RegressionData(object):
         x_transfer, y_transfer = self._transfer_time_vs_radius_regression()
         x_data, y_data = self._simulation_data.birch_radii, \
                                 self._simulation_data.mean_fetching_times
-        axis.plot(x_seek, y_seek, label='$ST = \\tau_t\\hat{N_c}$')
-        axis.plot(x_transfer, y_transfer, label='$TT = s_t\\hat{N_L}$')
+        axis.plot(x_seek, y_seek, label='$ST = \\tau_s\\hat{N_c}$')
+        axis.plot(x_transfer, y_transfer, label='$TT = \\frac{{ s_{{lc}}\\hat{{N_L}} + s_{{m}} \\hat{{N_c}}}}{{\\rho_{t}}}$')
         axis.plot(x_reg, y_reg, label='$FT = ST + TT$')
         axis.scatter(x_data, y_data)
         axis.legend(loc=4, prop={'size': 15})
@@ -498,7 +504,7 @@ class RegressionData(object):
         axis_nc.set_ylabel('Time $(seconds)$', fontsize=12)
 
         axis_r.scatter(r_data, y_data)
-        axis_r.plot(r_reg, y_r_reg, label='$y = {0:.2}N_c(R)$'.format(fit[0]))
+        axis_r.plot(r_reg, y_r_reg, label='$y = {0:.3}N_c(R)$'.format(fit[0]))
         axis_r.legend(prop={'size': 15})
         axis_r.set_title('Step 1 vs radius($S1 vs R$)', fontsize=12)
         axis_r.set_xlabel('$R$', fontsize=12)
@@ -697,7 +703,6 @@ class SimulationData(object):
 
     @property
     def avg_data_points_per_cluster_after_first_pass(self):
-        return np.array([np.mean(cluster_count) for cluster_count in self._clusters_count])
         return np.array([np.mean(cluster_count) for cluster_count in self._clusters_count])
 
     @property
