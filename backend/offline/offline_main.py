@@ -171,8 +171,7 @@ def transfer_field_1_to_2():
     config = load_config('/home/lucas/PycharmProjects/lightcurves-backend/backend/config.json')
     data_model_interface = DataModelInterface(config)
     offline_interface = OfflineInterface(data_model_interface, 2, 0, 0, 0, 0)
-    offline_interface.transfer_time_series('macho', 1)
-
+    offline_interface.transfer_time_series
 
 if __name__ == "__main__":
     start = time.time()
