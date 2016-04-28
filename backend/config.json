@@ -104,7 +104,7 @@
             },
             {
               "type": "mongodb",
-              "parameters": [30000, "lightcurves_f_1_3", "localhost", 27017]
+              "parameters": [30000, "lightcurves_f_1", "localhost", 27017]
             }
 
           ],

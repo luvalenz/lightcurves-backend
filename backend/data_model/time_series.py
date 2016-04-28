@@ -132,6 +132,17 @@ class MachoFileDataBase(TimeSeriesDataBase):
     def get_one(self, id_, original=True, phase=False, features=True, metadata=True):
         return DataMultibandTimeSeries.from_dict(self.get_one_dict(id_, original, phase, features, metadata))
 
+    def get_one_id(self, field, tile, index=0):
+        tar_path = os.path.join(self.light_curves_path, 'F_{0}'.format(field), '{0}.tar'.format(tile))
+        tar = tarfile.open(tar_path)
+        paths = tar.getnames()
+        ids = [path.split('_')[-1][:-6] for path in paths if path.endswith('.mjd')]
+        ids = sorted(list(set(ids)))
+        if len(ids) != 0:
+            return ids[index]
+        else:
+            return None
+
     def get_many_dict(self, field, tile, original=True, phase=False, features=True, metadata=True):
         tar_path = os.path.join(self.light_curves_path, 'F_{0}'.format(field), '{0}.tar'.format(tile))
         tar = tarfile.open(tar_path)
@@ -165,6 +176,9 @@ class MachoFileDataBase(TimeSeriesDataBase):
 
     def get_all(self, n_fields=82):
         return MachoTimeSeriesIterator(True, self, n_fields)
+
+    def get_missing(self, n_fields, destination_db):
+        return MachoTimeSeriesIterator(True, self, n_fields, destination_db)
 
     def get_many(self, field, tile, original=True, phase=False, features=True, metadata=True):
         list_of_dicts = self.get_many_dict(field, tile, original, phase, features, metadata)
@@ -315,6 +329,8 @@ class MongoTimeSeriesDataBase(TimeSeriesDataBase):
         else:
             return (DataMultibandTimeSeries.from_dict(dictionary) for dictionary in query_result)
 
+    def has_tile(self, catalog_name, field, tile):
+        return self.db[catalog_name].count({'metadata.field': field, 'metadata.tile': tile}) > 0
 
     def metadata_search(self, catalog_name, **kwargs):
         query = []
@@ -906,10 +922,11 @@ class MongoTimeSeriesIterator(TimeSeriesIterator):
 
 class MachoTimeSeriesIterator(TimeSeriesIterator):
 
-    def __init__(self, batch, database, n_fields=82):
+    def __init__(self, batch, database, n_fields=82, destination_db=None):
         self._batch = batch
         self._database = database
         self._n_fields = n_fields
+        self._destination_db = destination_db
         self.rewind()
 
 
@@ -931,6 +948,18 @@ class MachoTimeSeriesIterator(TimeSeriesIterator):
             raise StopIteration
         current_tile = self._current_field_tiles[self._current_tile_index]
         print('MACHO: Getting field {0}, tile {1}'.format(self._current_field, current_tile))
+        if self._destination_db is not None:
+            first_id = self._database.get_one_id(self._current_field, current_tile)
+
+            if first_id is None:
+                print('Tile is empty')
+                self._current_tile_index += 1
+                return None
+            first = self._destination_db.get_one('macho', 'macho.{0}'.format(first_id))
+            if first is not None:
+                print('Files were already added')
+                self._current_tile_index += 1
+                return None
         batch = self._database.get_many(self._current_field, current_tile)
         self._current_tile_index += 1
         return batch

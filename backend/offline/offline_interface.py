@@ -62,10 +62,24 @@ class OfflineInterface(object):
     def transfer_time_series(self, catalog_name, source_database_index):
         source_db = self._data_model_interface.get_time_series_database(source_database_index)
         destination_db = self.time_series_db
-        batch_iterable = source_db.get_all(3)#todo borrar este 2
+        batch_iterable = source_db.get_all()
         added_ids = []
         for batch in batch_iterable:
+
             if len(batch) != 0:
+                print ('Adding {0} elements to destination...'.format(len(batch))),
+                added_ids += destination_db.add_many(catalog_name, batch)
+                print('DONE')
+        self.setup()
+        return added_ids
+
+    def transfer_time_series_conditionally(self, catalog_name, source_database_index, last_field):
+        source_db = self._data_model_interface.get_time_series_database(source_database_index)
+        destination_db = self.time_series_db
+        batch_iterable = source_db.get_missing(last_field, destination_db)
+        added_ids = []
+        for batch in batch_iterable:
+            if batch is not None and len(batch) != 0:
                 print ('Adding {0} elements to destination...'.format(len(batch))),
                 added_ids += destination_db.add_many(catalog_name, batch)
                 print('DONE')

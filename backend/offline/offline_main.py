@@ -167,14 +167,15 @@ def plot_n_clusters_vs_thresholds():
 
 
 
-def transfer_field_1_to_2():
+def transfer_field_1():
     config = load_config('/home/lucas/PycharmProjects/lightcurves-backend/backend/config.json')
     data_model_interface = DataModelInterface(config)
     offline_interface = OfflineInterface(data_model_interface, 2, 0, 0, 0, 0)
-    offline_interface.transfer_time_series
+    offline_interface.transfer_time_series_conditionally('macho', 1, 1)
+
 
 if __name__ == "__main__":
     start = time.time()
-    transfer_field_1_to_2()
+    transfer_field_1()
     end = time.time()
     print humanize_time(end-start)
