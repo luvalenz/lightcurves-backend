@@ -52,7 +52,7 @@ class ExecutionTimes(object):
     def total_time(self, radius):
         return self.step1_time(radius) + self.seek_time(radius) + self.transfer_time(radius) + self.step2_time(radius)
 
-    def plot(self, logspace, min=0, max=9, jump=0.001):
+    def plot(self, logspace_x, logspace_y, min=0, max=9, jump=0.001):
         plt.style.use('bmh')
         x = np.arange(min, max, jump)
         step1 = self.step1_time(x)
@@ -60,25 +60,53 @@ class ExecutionTimes(object):
         transfer = self.transfer_time(x)
         step2 = self.step2_time(x)
         total = self.total_time(x)
-        gpu_limit = self.max_number_of_clusters_radius(x)
+        gpu_limit_x = self.max_number_of_clusters_radius(x)
+        gpu_limit_y = self.max_number_of_clusters
+        print gpu_limit_y
         n_clusters = self.n_clusters_function(x)
-        if logspace:
+        print n_clusters
+        start_str_x = ''
+        end_str_x = ''
+        start_str_y = ''
+        end_str_y = ''
+        if logspace_x:
             x = np.log(x)
+            gpu_limit_x = np.log(gpu_limit_x)
+            start_str_x = 'log('
+            end_str_x = ')'
+        if logspace_y:
+            step1 = np.log(step1)
+            seek = np.log(seek)
+            transfer = np.log(transfer)
+            step2 = np.log(step2)
+            total = np.log(total)
+            gpu_limit_y = np.log(gpu_limit_y)
+            n_clusters = np.log(n_clusters)
+            start_str_y = 'log('
+            end_str_y = ')'
         f, (ax1, ax2) = plt.subplots(2, sharex=True)
         f.suptitle('Predicted execution times for {0} lightcurves dataset'.format(self.n_lc))
         ax1.plot(x, n_clusters)
         ax1.set_title('Number of clusters', fontsize=12)
-        ax2.plot(x, total, label='total', linewidth=4)
-        ax2.plot(x, step1, label='step 1')
-        ax2.plot(x, seek, label='seek')
-        ax2.plot(x, transfer, label='transfer')
-        ax2.plot(x, step2, label='step 2')
+        ax2.set_xlabel('${0}R{1}$'.format(start_str_x, end_str_x), fontsize=12)
+        ax1.set_ylabel('${0}\# clusters{1}$'.format(start_str_y, end_str_y), fontsize=12)
+        ax2.plot(x, total, label='total')
+        ax2.plot(x, step1, '--', label='step 1')
+        ax2.plot(x, seek, '--', label='seek')
+        ax2.plot(x, transfer, '--', label='transfer')
+        ax2.plot(x, step2, '--', label='step 2')
         ax2.legend(prop={'size': 15})
         ax2.set_title('Execution times', fontsize=12)
-        ax2.set_xlabel('$R$', fontsize=12)
-        ax2.set_ylabel('$seconds$', fontsize=12)
-        ax1.axvline(x=gpu_limit)
-        ax2.axvline(x=gpu_limit)
+        ax2.set_xlabel('${0}R{1}$'.format(start_str_x, end_str_x), fontsize=12)
+        ax2.set_ylabel('${0}seconds{1}$'.format(start_str_y, end_str_y), fontsize=12)
+        # ax3 = ax1.twiny()
+        # ax3.set_xlim(ax1.get_xlim())
+        # x_ticks = np.arange(min, max, 0.5)
+        # ax3.set_xticks(x_ticks)
+        # ax3.set_xticklabels(self.n_clusters_function(x_ticks), rotation='vertical')
+        ax1.axvline(x=gpu_limit_x)
+        ax2.axvline(x=gpu_limit_x)
+        ax1.axhline(y=gpu_limit_y)
         plt.subplots_adjust(top=0.85)
         plt.show()
 
@@ -93,7 +121,7 @@ if __name__ == '__main__':
     time_per_light_curve_step1 = 1.3e-7
     time_per_light_curve_step2 = 3.9e-7
     transfer_rate = 91.70 * 10**6
-    seek_time = 15.62 * 10**-3
+    seek_time = 15.62 * 10**-4
     dimensionality = 5
     scalar_size = 24
     metadata_size = 160
@@ -107,4 +135,4 @@ if __name__ == '__main__':
                            transfer_rate, seek_time, dimensionality, scalar_size, metadata_size,
                            n_clusters_function, n_cluster_after_pass_function,
                            n_lc_after_pass_function, n_lc_per_cluster, number_of_lc, gpu_memory)
-    times.plot(True)
+    times.plot(True, True)
