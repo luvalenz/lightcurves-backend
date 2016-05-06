@@ -43,11 +43,11 @@ class ExecutionTimes(object):
         return self.hardware_seek_time*self.n_cluster_after_pass_function(radius)
 
     def transfer_time(self, radius):
-        return (self.n_cluster_after_pass_function(radius)*self.metadata_size +
+        return 1000*(self.n_cluster_after_pass_function(radius)*self.metadata_size +
                 self.n_lc_after_pass_function(radius)*self.light_curve_size)/self.transfer_rate
 
     def step2_time(self, radius):
-        return self.time_per_light_curve_step2 * self.n_lc_after_pass_function(radius)
+        return 1000*self.time_per_light_curve_step2 * self.n_lc_after_pass_function(radius)
 
     def total_time(self, radius):
         return self.step1_time(radius) + self.seek_time(radius) + self.transfer_time(radius) + self.step2_time(radius)
@@ -104,6 +104,7 @@ class ExecutionTimes(object):
         # x_ticks = np.arange(min, max, 0.5)
         # ax3.set_xticks(x_ticks)
         # ax3.set_xticklabels(self.n_clusters_function(x_ticks), rotation='vertical')
+        plt.ylim([-3, 3])
         ax1.axvline(x=gpu_limit_x)
         ax2.axvline(x=gpu_limit_x)
         ax1.axhline(y=gpu_limit_y)
@@ -122,11 +123,11 @@ if __name__ == '__main__':
     time_per_light_curve_step2 = 3.9e-7
     transfer_rate = 91.70 * 10**6
     seek_time = 15.62 * 10**-4
-    dimensionality = 5
+    dimensionality = 50
     scalar_size = 24
     metadata_size = 160
     number_of_lc = 436865
-    gpu_memory = 6*10**6
+    gpu_memory = 12*10**6
     n_clusters_function = lambda x: 6.31e3/x**2 + 1.15e4/x - 4.3e3
     n_cluster_after_pass_function = lambda x: np.exp(-0.92*np.log(x)**2+0.33*np.log(x)+6.52)
     n_lc_after_pass_function = lambda x: np.exp(0.12*np.log(x)**3 - 0.94*np.log(x)**2 + 1.99*np.log(x) + 11.82)

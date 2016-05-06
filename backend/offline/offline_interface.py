@@ -65,13 +65,49 @@ class OfflineInterface(object):
         batch_iterable = source_db.get_all()
         added_ids = []
         for batch in batch_iterable:
-
             if len(batch) != 0:
                 print ('Adding {0} elements to destination...'.format(len(batch))),
                 added_ids += destination_db.add_many(catalog_name, batch)
                 print('DONE')
         self.setup()
         return added_ids
+
+    def fit_reduction_with_external_db(self, source_db, n_fields):
+        batch_iterable = source_db.get_all(n_fields, False)
+        total_added = 0
+        for batch in batch_iterable:
+            if len(batch) != 0:
+                print("Trying to add {0} time series to reduction model... ".format(len(batch))),
+                n_added = self.reduction_model.add_many_time_series(batch)
+                total_added += n_added
+                print("DONE, {0} added".format(n_added))
+        print("Fitting model... "),
+        self.reduction_model.fit()
+        print("DONE")
+        print("\nUpdating reduction model to database..."),
+        self.serialization_db.store_reduction_model(self.reduction_model)
+        print("DONE\n")
+        return total_added
+
+    def reduce_from_external_db(self, catalog_name, total_added, source_db, n_fields):
+        batch_iterable = source_db.get_missing(n_fields, self.time_series_db, False)
+        for batch in batch_iterable:
+            if batch is not None:
+                n_data = len(batch)
+                if n_data != 0:
+                    print("Calculating reduced vectors for {0} time series... ".format(n_data)),
+                    updated_time_series_iterator = self.reduction_model.transform_many_time_series(batch)
+                    print('DONE')
+                    if updated_time_series_iterator is not None:
+                        print("Adding time series to database..."),
+                        self.time_series_db.add_many(catalog_name, updated_time_series_iterator)
+                        print("DONE")
+
+    def fit_reduce_from_external_db(self, catalog_name, source_database_index, n_fields):
+        source_db = self._data_model_interface.get_time_series_database(source_database_index)
+        n_added = self.fit_reduction_with_external_db(source_db, n_fields)
+        if n_added > 0:
+            self.reduce_from_external_db(catalog_name, n_added, source_db, n_fields)
 
     def transfer_time_series_conditionally(self, catalog_name, source_database_index, last_field):
         source_db = self._data_model_interface.get_time_series_database(source_database_index)
@@ -80,9 +116,9 @@ class OfflineInterface(object):
         added_ids = []
         for batch in batch_iterable:
             if batch is not None and len(batch) != 0:
-                print ('Adding {0} elements to destination...'.format(len(batch))),
-                added_ids += destination_db.add_many(catalog_name, batch)
-                print('DONE')
+                print("Trying to add {0} time series to reduction model... ".format(len(batch))),
+                n_added = self.reduction_model.add_many_time_series(batch)
+                print("DONE, {0} added".format(n_added))
         self.setup()
         return added_ids
     
@@ -161,7 +197,9 @@ class OfflineInterface(object):
         batch_iterable = self.time_series_db.get_many(time_series_ids, catalog_name, False)
         self._cluster(batch_iterable)
     
-    def store_all_clusters(self):
+    def store_all_clusters(self, clusters_max_size=None):
+        if clusters_max_size is not None:
+            self.clustering_model.clusters_max_size = clusters_max_size
         n_clusters = int(self.clustering_model.get_number_of_clusters())
         self.clustering_db.reset_database(self.clustering_model.metadata)
         print("Storing {0} clusters...".format(n_clusters))

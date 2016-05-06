@@ -94,6 +94,8 @@ class MachoFileDataBase(TimeSeriesDataBase):
     def __init__(self, light_curves_path, features_path):
         self.light_curves_path = light_curves_path
         self.features_path = features_path
+        self._current_tile_features_path = None
+        self._current_tile_features_dataframe = None
 
     @property
     def catalog_names(self):
@@ -144,41 +146,45 @@ class MachoFileDataBase(TimeSeriesDataBase):
             return None
 
     def get_many_dict(self, field, tile, original=True, phase=False, features=True, metadata=True):
-        tar_path = os.path.join(self.light_curves_path, 'F_{0}'.format(field), '{0}.tar'.format(tile))
-        tar = tarfile.open(tar_path)
-        paths = tar.getnames()
-        ids = [path.split('_')[-1][:-6] for path in paths if path.endswith('.mjd')]
-        ids = sorted(list(set(ids)))
-        band_names = ['B', 'R']
+        self._update_tile_features_dataframe(field, tile)
         list_of_dicts = []
-        for id_ in ids:
-            bands_dict = {}
-            metadata_dict = None
-            seq = id_.split('.')[-1]
-            for band_name in band_names:
-                band_path = 'F_{0}/{1}/lc_{2}.{3}.mjd'.format(field, tile, id_, band_name)
-                try:
-                    light_curve_file_string = tar.extractfile(tar.getmember(band_path)).read()
-                    if metadata and metadata_dict is None :
-                        metadata_dict = MachoFileDataBase._get_metadata_dict(field, tile, seq, light_curve_file_string)
-                    if original:
-                        band_data_frame = pd.read_csv(StringIO(light_curve_file_string), header=2, delimiter=' ')
-                        this_band_dict = MachoFileDataBase._get_band_dict(band_data_frame)
-                        bands_dict[band_name] = this_band_dict
-                except KeyError:
-                    pass
-            features_dict = {}
-            if features:
-                features_dict = self.get_features(id_)
-            list_of_dicts.append({'bands': bands_dict, 'features': features_dict,
-                                  'metadata': metadata_dict, 'id': 'macho.{0}'.format(id_)})
+        if self._current_tile_features_dataframe is not None:
+            ids = self._current_tile_features_dataframe.index.values
+            band_names = ['B', 'R']
+            list_of_dicts = []
+            if original:
+                tar_path = os.path.join(self.light_curves_path, 'F_{0}'.format(field), '{0}.tar'.format(tile))
+                tar = tarfile.open(tar_path)
+            for id_ in ids:
+                bands_dict = {}
+                seq = id_.split('.')[-1]
+                metadata_dict = {'field': field, 'tile': tile, 'seq': seq, 'catalog': 'macho'}
+                if original:
+                    for band_name in band_names:
+                        band_path = 'F_{0}/{1}/lc_{2}.{3}.mjd'.format(field, tile, id_, band_name)
+                        try:
+                            light_curve_file_string = tar.extractfile(tar.getmember(band_path)).read()
+                            if metadata and metadata_dict is None :
+                                ra, dec = MachoFileDataBase._get_ra_dec(field, tile, seq)
+                                metadata_dict['ra'] = ra
+                                metadata_dict['dec'] = dec
+                                band_data_frame = pd.read_csv(StringIO(light_curve_file_string), header=2, delimiter=' ')
+                                this_band_dict = MachoFileDataBase._get_band_dict(band_data_frame)
+                                bands_dict[band_name] = this_band_dict
+                        except KeyError:
+                            pass
+                features_dict = {}
+                if features:
+                    features_dict = self.get_features(id_)
+                list_of_dicts.append({'bands': bands_dict, 'features': features_dict,
+                                      'metadata': metadata_dict, 'id': 'macho.{0}'.format(id_)})
         return list_of_dicts
 
-    def get_all(self, n_fields=82):
-        return MachoTimeSeriesIterator(True, self, n_fields)
+    def get_all(self, n_fields=82, get_originals=True):
+        return MachoTimeSeriesIterator(True, self, n_fields, None, get_originals)
 
-    def get_missing(self, n_fields, destination_db):
-        return MachoTimeSeriesIterator(True, self, n_fields, destination_db)
+    def get_missing(self, n_fields, destination_db, get_originals=True):
+        return MachoTimeSeriesIterator(True, self, n_fields, destination_db, get_originals)
 
     def get_many(self, field, tile, original=True, phase=False, features=True, metadata=True):
         list_of_dicts = self.get_many_dict(field, tile, original, phase, features, metadata)
@@ -191,10 +197,10 @@ class MachoFileDataBase(TimeSeriesDataBase):
         pass
 
     @staticmethod
-    def _get_metadata_dict(field, tile, seq, file_string):
+    def _get_ra_dec(file_string):
         metadata_string = file_string.split('\n')[1]
         ra, dec = [float(s) for s in metadata_string.split()[3:5]]
-        return {'field': field, 'tile': tile, 'seq': seq, 'ra': ra, 'dec': dec, 'catalog': 'macho'}
+        return ra, dec
 
     @staticmethod
     def _get_band_dict(data_frame):
@@ -230,12 +236,23 @@ class MachoFileDataBase(TimeSeriesDataBase):
     def get_features(self, id_):
         try:
             field, tile, seq = id_.split('.')
-            tile_features_path = os.path.join(self.features_path, "F_{0}_{1}.csv".format(field, tile))
-            tile_features_df = pd.read_csv(tile_features_path, sep=',', index_col=0)
+            self._update_tile_features_dataframe(field, tile)
+            tile_features_df = self._current_tile_features_dataframe
             lc_features_df = tile_features_df.loc[id_]
             return lc_features_df.to_dict()
-        except:
+        except IOError:
             return {}
+
+    def _update_tile_features_dataframe(self, field, tile):
+        tile_features_path = os.path.join(self.features_path, "F_{0}_{1}.csv".format(field, tile))
+        if self._current_tile_features_path != tile_features_path:
+            try:
+                self._current_tile_features_path = tile_features_path
+                self._current_tile_features_dataframe = \
+                    pd.read_csv(self._current_tile_features_path, sep=',', index_col=0)
+            except:
+                self._current_tile_features_path = None
+                self._current_tile_features_dataframe = None
 
     def get_metadata(self, id_):
         field, tile, seq = id_.split('.')
@@ -303,7 +320,7 @@ class MongoTimeSeriesDataBase(TimeSeriesDataBase):
         cursors = []
         for catalog in catalogs:
             collection = self.db[catalog]
-            cursor = collection.find(query_dict)
+            cursor = collection.find(query_dict, no_cursor_timeout=True)
             cursors.append(cursor)
         return MongoTimeSeriesIterator(cursors, batch, batch_size)
 
@@ -866,7 +883,7 @@ class MongoTimeSeriesIterator(TimeSeriesIterator):
     def __init__(self, cursors, batch=True, batch_size=5*10**5):
         self._batch = batch
         self._batch_size = batch_size
-        self._cursors = [cursor.clone() for cursor in cursors]
+        self._cursors = [cursor for cursor in cursors]
         self._current_cursor_index = 0
 
     def __len__(self):
@@ -881,9 +898,12 @@ class MongoTimeSeriesIterator(TimeSeriesIterator):
     def next_unit(self):
         while True:
             if self._current_cursor_index >= len(self._cursors):
+                for cursor in self._cursors:
+                    cursor.close()
                 raise StopIteration
             try:
                 time_series_dict = self._current_cursor.next()
+                #print time_series_dict['id']
                 return DataMultibandTimeSeries.from_dict(time_series_dict)
             except StopIteration:
                 self._current_cursor_index += 1
@@ -922,11 +942,12 @@ class MongoTimeSeriesIterator(TimeSeriesIterator):
 
 class MachoTimeSeriesIterator(TimeSeriesIterator):
 
-    def __init__(self, batch, database, n_fields=82, destination_db=None):
+    def __init__(self, batch, database, n_fields=82, destination_db=None, originals=True):
         self._batch = batch
         self._database = database
         self._n_fields = n_fields
         self._destination_db = destination_db
+        self._originals = originals
         self.rewind()
 
 
@@ -950,7 +971,6 @@ class MachoTimeSeriesIterator(TimeSeriesIterator):
         print('MACHO: Getting field {0}, tile {1}'.format(self._current_field, current_tile))
         if self._destination_db is not None:
             first_id = self._database.get_one_id(self._current_field, current_tile)
-
             if first_id is None:
                 print('Tile is empty')
                 self._current_tile_index += 1
@@ -960,7 +980,7 @@ class MachoTimeSeriesIterator(TimeSeriesIterator):
                 print('Files were already added')
                 self._current_tile_index += 1
                 return None
-        batch = self._database.get_many(self._current_field, current_tile)
+        batch = self._database.get_many(self._current_field, current_tile, self._originals)
         self._current_tile_index += 1
         return batch
 

@@ -1,7 +1,7 @@
 __author__ = 'lucas'
 
 import os, json
-from backend.offline.offline_algorithms import Birch, IncrementalPCA as IPCA
+from backend.offline.offline_algorithms import Birch, IncrementalPCA as IPCA, ScikitIncrementalPCAWrapper as ScikitIPCA
 from backend.data_model.time_series import MongoTimeSeriesDataBase, MachoFileDataBase
 from backend.data_model.clusters import ClustersMongoDataBase, Cluster
 from backend.data_model.serializations import SerializationMongoDatabase
@@ -28,6 +28,8 @@ class DataModelInterface(object):
             parameters = model_info['parameters']
             if model_type == 'ipca':
                 Model = IPCA
+            elif model_type == 'scikit_ipca':
+                Model = ScikitIPCA
             return Model(*parameters)
 
     def get_clustering_model(self, serialization_db_index=0, model_index=0):

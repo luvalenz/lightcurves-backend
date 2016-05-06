@@ -2,6 +2,10 @@
   "clustering_algorithms":
           [
             {
+              "type": null,
+              "parameters": null
+            },
+            {
               "type": "birch",
               "parameters": [1, false]
             },
@@ -38,8 +42,8 @@
               "parameters": [9, false]
             },
             {
-              "type": "birch",
-              "parameters": [10, false]
+              "type": null,
+              "parameters": null
             },
             {
               "type": "birch",
@@ -76,16 +80,12 @@
             {
               "type": "birch",
               "parameters": [0.9, false]
-            },
-            {
-              "type": "birch",
-              "parameters": [1, true, 10000]
             }
           ],
   "reduction_algorithms":
           [
             {
-              "type": "ipca",
+              "type": "scikit_ipca",
               "parameters" : [5]
             }
           ],
@@ -110,6 +110,10 @@
           ],
   "clustering_databases":
           [
+            { 
+              "type": null,
+              "parameters": null
+            },
             {
               "type": "mongodb",
               "parameters": ["clusters_t1", "localhost", 27017]
@@ -146,9 +150,9 @@
               "type": "mongodb",
               "parameters": ["clusters_t9", "localhost", 27017]
             },
-            {
-              "type": "mongodb",
-              "parameters": ["clusters_t10", "localhost", 27017]
+            { 
+              "type": null,
+              "parameters": null
             },
             {
               "type": "mongodb",
@@ -185,10 +189,94 @@
             {
               "type": "mongodb",
               "parameters": ["clusters_t0_9", "localhost", 27017]
+            },
+            { 
+              "type": null,
+              "parameters": null
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["balanced_clusters_t1", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["balanced_clusters_t2", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["balanced_clusters_t3", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["balanced_clusters_t4", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["balanced_clusters_t5", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["balanced_clusters_t6", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["balanced_clusters_t7", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["balanced_clusters_t8", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["balanced_clusters_t9", "localhost", 27017]
+            },
+            { 
+              "type": null,
+              "parameters": null
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["balanced_clusters_t0_1", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["balanced_clusters_t0_2", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["balanced_clusters_t0_3", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["balanced_clusters_t0_4", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["balanced_clusters_t0_5", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["balanced_clusters_t0_6", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["balanced_clusters_t0_7", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["balanced_clusters_t0_8", "localhost", 27017]
+            },
+            {
+              "type": "mongodb",
+              "parameters": ["balanced_clusters_t0_9", "localhost", 27017]
             }
           ],
   "serialization_databases":
           [
+            {
+              "type": "mongodb",
+              "parameters": ["serializations_f1", "localhost", 27017]
+            },
             {
               "type": "mongodb",
               "parameters": ["serializations_f1_t1", "localhost", 27017]

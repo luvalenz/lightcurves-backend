@@ -3,16 +3,12 @@ __author__ = 'lucas'
 import numpy as np
 from abc import ABCMeta, abstractmethod, abstractproperty
 import itertools
-import pandas as pd
 import scipy.spatial.distance as dist
 from scipy.misc import comb
-import os
-import pickle
 import operator
-import statsmodels.robust.scale as scale
 from ..data_model.clusters import ClustersIterator
 from ..data_model.time_series import DataMultibandTimeSeries
-import time
+from sklearn.decomposition import IncrementalPCA as ScikitIPCA
 
 #python 2
 
@@ -115,6 +111,9 @@ class Birch(IncrementalClustering):
 
     def get_cluster_list(self, **kwargs):
         global_clusters = self._global_clustering
+        if 'max_size' in kwargs:
+            was_none = self.clusters_max_size is None
+            self.clusters_max_size = kwargs['max_size']
         if 'mode' in kwargs:
             if kwargs['mode'] == 'global':
                 global_clusters = True
@@ -134,6 +133,8 @@ class Birch(IncrementalClustering):
         for center, label in itertools.izip(centers, unique_labels):
             lc_indices = data[np.where(labels == label)[0]].tolist()
             cluster_list.append(lc_indices)
+        if 'max_size' in kwargs and was_none:
+            self.clusters_max_size = None
         return centers, cluster_list
 
     def get_cluster_iterator(self, time_series_database, **kwargs):
@@ -701,6 +702,7 @@ class ClusteringFeature:
     def is_empty(self):
         return self.count == 0
 
+    @property
     def size(self):
         return self.birch.cluster_size(self.count, self.linear_sum, self.squared_norm)
 
@@ -770,6 +772,9 @@ class NonLeafClusteringFeature(ClusteringFeature):
 
     def get_clusters(self):
         max_size = self.birch.clusters_max_size
+        print self.size
+        if np.abs(self.size - 32213.0507714) < 10:
+            print "stop"
         if max_size is not None and self.size < max_size:
             return self
         return self.child.get_clusters()
@@ -802,6 +807,67 @@ class IncrementalDimensionalityReduction:
         pass
 
 
+class ScikitIncrementalPCAWrapper(IncrementalDimensionalityReduction):
+
+    def __init__(self, n_components=None):
+        self._scikit_ipca = ScikitIPCA(n_components)
+        self._data_ids = []
+
+    def add_many_time_series(self, time_series_list):
+        vectors_to_add = []
+        ids_to_add = []
+        n_added = 0
+        for time_series in time_series_list:
+            feature_vector = time_series.feature_vector
+            id_ = time_series.id
+            if self._can_add_one_time_series(feature_vector, id_):
+                vectors_to_add.append(feature_vector)
+                ids_to_add.append(id_)
+                n_added += 1
+        if len(vectors_to_add) != 0:
+            matrix_to_add = np.vstack(vectors_to_add)
+            self._add_matrix(matrix_to_add, ids_to_add)
+        return n_added
+
+    def transform_one_time_series(self, time_series):
+        feature_vector = time_series.feature_vector
+        id_ = time_series.id
+        reduced_vector = self._scikit_ipca(feature_vector, id_)
+        time_series.set_reduced(reduced_vector.tolist())
+        return time_series
+
+    def transform_many_time_series(self, time_series_sequence):
+        feature_vectors = []
+        ids= []
+        catalogs = []
+        for time_series in time_series_sequence:
+            id_ = time_series.id
+            feature_vector = time_series.feature_vector
+            catalog = time_series.catalog
+            if feature_vector is not None and len(feature_vector) != 0:
+                feature_vectors.append(feature_vector)
+                ids.append(id_)
+                catalogs.append(catalog)
+        if len(feature_vectors) != 0:
+            feature_matrix = np.vstack(feature_vectors)
+            reduced_matrix = self._scikit_ipca.transform(feature_matrix)
+            return (DataMultibandTimeSeries(None, None, None, None, id_, None, reduced_vector, None, {'catalog': catalog})
+                    for id_, catalog, reduced_vector in itertools.izip(ids, catalogs, reduced_matrix))
+        return None
+
+    def fit(self):
+        pass
+
+    def _can_add_one_time_series(self, feature_vector, id_):
+        if id_ not in self._data_ids and feature_vector is not None and len(feature_vector) != 0:
+            return True
+        return False
+
+    def _add_matrix(self, data_matrix, data_ids):
+        self._scikit_ipca.partial_fit(data_matrix)
+        self._data_ids += data_ids
+
+
 class IncrementalPCA(IncrementalDimensionalityReduction):
 
     def __init__(self, n_components=None):
@@ -821,7 +887,8 @@ class IncrementalPCA(IncrementalDimensionalityReduction):
     def calculate_cov(self, x):
         x_std = self.standarize(x)
         n = len(x)
-        return np.nan_to_num(np.matrix(x_std).T*np.matrix(x_std))/n
+        cov = np.nan_to_num(np.matrix(x_std).T*np.matrix(x_std))/n
+        return cov
 
     @staticmethod
     def xtx(cov, std, mean, n):
@@ -893,7 +960,6 @@ class IncrementalPCA(IncrementalDimensionalityReduction):
             # if np.isnan(np.sum(self.cov)):
             #     print(self.cov)
             n = self.n + len(x)
-
 
     @staticmethod
     def _update_time_series(time_series_list, reduced_matrix):
