@@ -5,6 +5,7 @@ from pymongo import MongoClient
 import cPickle as pickle
 from bson.binary import Binary
 import gridfs
+import os
 
 
 class SerializationDatabase(object):
@@ -103,3 +104,45 @@ class SerializationMongoDatabase(object):
                                 no_cursor_timeout=True):
             fs.delete(grid_out._id)
         fs.put(binary_data, filename=filename)
+
+
+class SerializationPandasDatabase(object):
+
+    __metaclass_ = ABCMeta
+
+    def __init__(self, name, path):
+        self._name = name
+        self._path = path
+
+    @property
+    def has_reduction_model(self):
+        reduction_path = os.path.join(self._path, 'reduction.pkl')
+        return os.path.isfile(reduction_path)
+
+    @property
+    def has_clustering_model(self):
+        clustering_path = os.path.join(self._path, 'clustering.pkl')
+        return os.path.isfile(clustering_path)
+
+    @property
+    def reduction_model(self):
+        reduction_path = os.path.join(self._path, 'reduction.pkl')
+        with open(reduction_path, "rb") as input_file:
+            return pickle.load(input_file)
+
+    @property
+    def clustering_model(self):
+        clustering_path = os.path.join(self._path, 'clustering.pkl')
+        with open(clustering_path, "rb") as input_file:
+            return pickle.load(input_file)
+
+    def setup(self):
+        pass
+
+    def store_reduction_model(self, model):
+        with open(os.path.join(self._path,  "reduction.pkl"), "wb") as input_file:
+            pickle.dump(model, input_file, 2)
+
+    def store_clustering_model(self, model):
+        with open(os.path.join(self._path,  "clustering.pkl"), "wb") as input_file:
+            pickle.dump(model, input_file, 2)

@@ -15,6 +15,7 @@ import pymongo
 from pymongo import MongoClient
 import glob
 import random
+import pickle
 
 
 class TimeSeriesDataBase(object):
@@ -419,12 +420,17 @@ class MongoTimeSeriesDataBase(TimeSeriesDataBase):
 
 class PandasTimeSeriesDataBase():
 
-    def __init__(self, dataframe):
-        self.dataframe = dataframe
+    def __init__(self, name, path):
+        self._path = path
+        self._name = name
+        with open(os.path.join(path, '{0}.pkl'.format(name))) as file_input:
+            dataframe = pickle.load(file_input)
+        self._dataframe = dataframe
 
     def get_all(self):
         return (DataMultibandTimeSeries(id_=element[0], reduced_vector=element[1].tolist())
-                for element in self.dataframe.iterrows())
+                for element in self._dataframe.iterrows())
+
 
 class MultibandTimeSeries(object):
     __metaclass__ = ABCMeta

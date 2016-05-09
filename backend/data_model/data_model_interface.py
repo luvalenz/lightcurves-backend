@@ -2,9 +2,9 @@ __author__ = 'lucas'
 
 import os, json
 from backend.offline.offline_algorithms import Birch, IncrementalPCA as IPCA, ScikitIncrementalPCAWrapper as ScikitIPCA
-from backend.data_model.time_series import MongoTimeSeriesDataBase, MachoFileDataBase
+from backend.data_model.time_series import MongoTimeSeriesDataBase, MachoFileDataBase, PandasTimeSeriesDataBase
 from backend.data_model.clusters import ClustersMongoDataBase, Cluster
-from backend.data_model.serializations import SerializationMongoDatabase
+from backend.data_model.serializations import SerializationMongoDatabase, SerializationPandasDatabase
 
 
 def load_config(config_path):
@@ -52,6 +52,8 @@ class DataModelInterface(object):
             Database = MongoTimeSeriesDataBase
         elif model_type == 'macho':
             Database = MachoFileDataBase
+        elif model_type == 'pandas':
+            Database = PandasTimeSeriesDataBase
         return Database(*parameters)
 
     def get_clustering_database(self, index=0):
@@ -68,4 +70,6 @@ class DataModelInterface(object):
         parameters = db_info['parameters']
         if model_type == 'mongodb':
             Database = SerializationMongoDatabase
+        elif model_type == 'pandas':
+            Database = SerializationPandasDatabase
         return Database(*parameters)

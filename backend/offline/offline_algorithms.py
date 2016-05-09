@@ -102,15 +102,9 @@ class Birch(IncrementalClustering):
         self._globally_labeled_data = None
         n_added = 0
         i = 0
-        t0 = time.time()
         for time_series in time_series_list:
             if self._try_add_one_time_series(time_series):
                 n_added += 1
-            if i % 100 == 0:
-                t1 = time.time()
-                dt = t1-t0
-                t0 = t1
-                print(dt)
             if i > 0 and i % 100000 == 0:
                 print("{0} added, out of {1} attempted...".format(n_added, i))
             i += 1

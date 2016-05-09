@@ -5,7 +5,7 @@ import numpy as np
 from scipy.special import gamma
 from backend.offline.offline_algorithms import Birch
 import time
-
+import sys
 
 def humanize_time(total_seconds):
     total_seconds = int(total_seconds)
@@ -25,14 +25,13 @@ def transfer_field_1():
     n_fields = 1
     offline_interface.reduce_from_external_db('macho', 0, source_db, n_fields)
 
-def cluster_field1():
-    for clustering_model in range(9, 20):
-        if clustering_model % 10 != 0:
-            print ("### CLUSTERING FIELD 1 WITH model {0} ###".format(clustering_model))
-            config = load_config('/home/lucas/PycharmProjects/lightcurves-backend/backend/config.json')
-            data_model_interface = DataModelInterface(config)
-            offline_interface = OfflineInterface(data_model_interface, 2, clustering_model, clustering_model, clustering_model, 0)
-            offline_interface.cluster_all()
+def cluster_field1(clustering_model):
+    if clustering_model % 10 != 0:
+        print ("### CLUSTERING FIELD 1 WITH model {0} ###".format(clustering_model))
+        config = load_config('/home/lucas/PycharmProjects/lightcurves-backend/backend/config.json')
+        data_model_interface = DataModelInterface(config)
+        offline_interface = OfflineInterface(data_model_interface, 3, clustering_model, clustering_model, clustering_model, 0)
+        offline_interface.cluster_all()
 
 def store_field1_balanced():
     dbs = range(21, 40)
@@ -72,11 +71,10 @@ def to_pands():
     offline_interface = OfflineInterface(data_model_interface, 2, 0, 0, 0, 0)
     offline_interface.to_pandas_dataframe('field1_df.pkl')
 
-
-
-
 if __name__ == "__main__":
     start = time.time()
-    cluster_field1()
+    #clustering_model_index = 9
+    clustering_model_index = sys.argv[1]
+    cluster_field1(clustering_model_index)
     end = time.time()
     print(humanize_time(end-start))

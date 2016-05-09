@@ -184,7 +184,7 @@ class OfflineInterface(object):
         self._reduce(time_series_iterator)
 
     def _cluster(self, time_series_sequence):
-        print("Trying to add {0} time series to clustering model... ".format(len(time_series_sequence))),
+        print("Trying to add time series to clustering model... "),
         n_added = self.clustering_model.add_many_time_series(time_series_sequence)
         print("{0} successfully added".format(n_added))
         print("Updating clustering model to database..."),
