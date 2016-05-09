@@ -417,6 +417,15 @@ class MongoTimeSeriesDataBase(TimeSeriesDataBase):
         return DataMultibandTimeSeries.extract_bands_dict(bands_dict)
 
 
+class PandasTimeSeriesDataBase():
+
+    def __init__(self, dataframe):
+        self.dataframe = dataframe
+
+    def get_all(self):
+        return (DataMultibandTimeSeries(id_=element[0], reduced_vector=element[1].tolist())
+                for element in self.dataframe.iterrows())
+
 class MultibandTimeSeries(object):
     __metaclass__ = ABCMeta
 

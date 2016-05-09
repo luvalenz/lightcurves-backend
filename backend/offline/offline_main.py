@@ -3,7 +3,7 @@ from backend.data_model.data_model_interface import DataModelInterface, load_con
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.special import gamma
-
+from backend.offline.offline_algorithms import Birch
 import time
 
 
@@ -14,7 +14,6 @@ def humanize_time(total_seconds):
     minutes = remainder / 60
     seconds = remainder % 60
     return "{0}:{1}:{2}".format(hours, minutes, seconds)
-
 
 def transfer_field_1():
     config = load_config('/home/lucas/PycharmProjects/lightcurves-backend/backend/config.json')
@@ -27,7 +26,7 @@ def transfer_field_1():
     offline_interface.reduce_from_external_db('macho', 0, source_db, n_fields)
 
 def cluster_field1():
-    for clustering_model in range(11, 20):
+    for clustering_model in range(9, 20):
         if clustering_model % 10 != 0:
             print ("### CLUSTERING FIELD 1 WITH model {0} ###".format(clustering_model))
             config = load_config('/home/lucas/PycharmProjects/lightcurves-backend/backend/config.json')
@@ -36,7 +35,7 @@ def cluster_field1():
             offline_interface.cluster_all()
 
 def store_field1_balanced():
-    dbs = range(22, 40)
+    dbs = range(21, 40)
     max_radii = np.hstack((range(1,10), np.arange(0.1,1,0.1)))
     for clustering_db_index, max_size in zip(dbs, max_radii):
         if clustering_db_index % 10 != 0:
@@ -51,18 +50,33 @@ def store_field1_balanced():
                  serialization_db_index, clustering_model_index, reduction_model_index)
             offline_interface.store_all_clusters(max_size)
 
-# def cluster_field1_new_birch():
-#     for clustering_model in range(13, 19):
-#         threshold = float(clustering_model - 9)/10
-#         print ("### CLUSTERING FIELD 1 WITH THRESHOLD {0} ###".format(threshold))
-#         config = load_config('/home/lucas/PycharmProjects/lightcurves-backend/backend/config.json')
-#         data_model_interface = DataModelInterface(config)
-#         offline_interface = OfflineInterface(data_model_interface, 0, clustering_model, clustering_model, clustering_model, 0)
-#         offline_interface.cluster_all()
+
+def clustering_test():
+    n = 1000
+    d = 2
+    x1 = 100*np.random.uniform(-1,1,(n*d)).reshape((n,d))
+    x2 = 1*np.random.uniform(-1,1,(n*d)).reshape((n,d))
+    x = np.vstack((x1,x2))
+    brc = Birch(0.5, False, 2)
+    for id_, element in zip(range(len(x)), x):
+        brc._add_data_point(str(id_), element)
+  #  brc.clusters_max_size = 2
+    n_clusters = brc.get_number_of_clusters()
+    l = brc.get_cluster_list()
+    print(n_clusters)
+    print(l)
+
+def to_pands():
+    config = load_config('/home/lucas/PycharmProjects/lightcurves-backend/backend/config.json')
+    data_model_interface = DataModelInterface(config)
+    offline_interface = OfflineInterface(data_model_interface, 2, 0, 0, 0, 0)
+    offline_interface.to_pandas_dataframe('field1_df.pkl')
+
+
 
 
 if __name__ == "__main__":
     start = time.time()
-    store_field1_balanced()
+    cluster_field1()
     end = time.time()
     print(humanize_time(end-start))

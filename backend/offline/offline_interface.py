@@ -2,6 +2,8 @@ __author__ = 'lucas'
 
 from backend.data_model.data_model_interface import DataModelInterface
 import itertools
+import numpy as np
+import pandas as pd
 
 
 class OfflineInterface(object):
@@ -193,13 +195,31 @@ class OfflineInterface(object):
         time_series_sequence = self.time_series_db.get_all()
         self._cluster(time_series_sequence)
 
+    def to_pandas_dataframe(self, path):
+        reduced_vectors = []
+        ids = []
+        time_series_sequence = self.time_series_db.get_all()
+        i = 0
+        for time_series in time_series_sequence:
+            reduced_vector = time_series.reduced_vector
+            if reduced_vector is not None and len(reduced_vector) != 0:
+                ids.append(time_series.id)
+                reduced_vectors.append(reduced_vector)
+            if i % 1000 == 0:
+                print(i)
+            i += 1
+        reduced_matrix = np.vstack(reduced_vectors)
+        df = pd.DataFrame(reduced_matrix, ids)
+        df.to_pickle(path)
+
+
     def cluster_some(self, time_series_ids, catalog_name=None):
         batch_iterable = self.time_series_db.get_many(time_series_ids, catalog_name, False)
         self._cluster(batch_iterable)
     
     def store_all_clusters(self, clusters_max_size=None):
-        if clusters_max_size is not None:
-            self.clustering_model.clusters_max_size = clusters_max_size
+        # if clusters_max_size is not None:
+        #     self.clustering_model.clusters_max_size = clusters_max_size
         n_clusters = int(self.clustering_model.get_number_of_clusters())
         self.clustering_db.reset_database(self.clustering_model.metadata)
         print("Storing {0} clusters...".format(n_clusters))

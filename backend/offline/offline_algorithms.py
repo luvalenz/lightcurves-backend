@@ -9,6 +9,7 @@ import operator
 from ..data_model.clusters import ClustersIterator
 from ..data_model.time_series import DataMultibandTimeSeries
 from sklearn.decomposition import IncrementalPCA as ScikitIPCA
+import time
 
 #python 2
 
@@ -101,9 +102,15 @@ class Birch(IncrementalClustering):
         self._globally_labeled_data = None
         n_added = 0
         i = 0
+        t0 = time.time()
         for time_series in time_series_list:
             if self._try_add_one_time_series(time_series):
                 n_added += 1
+            if i % 100 == 0:
+                t1 = time.time()
+                dt = t1-t0
+                t0 = t1
+                print(dt)
             if i > 0 and i % 100000 == 0:
                 print("{0} added, out of {1} attempted...".format(n_added, i))
             i += 1
@@ -403,7 +410,7 @@ class Birch(IncrementalClustering):
 
     @staticmethod
     def to_float(count, linear_sum, squared_norm):
-        return float(count), linear_sum.astype(np.float32), squared_norm.astype(np.float32)
+        return float(count), linear_sum.astype(np.float64), squared_norm.astype(np.float64)
 
     @staticmethod
     def radius(count, linear_sum, squared_norm):
@@ -453,10 +460,6 @@ class Birch(IncrementalClustering):
         result_2 = count_2 * Birch.radius(count_2, linear_sum_2, squared_norm2)**2
         result = result_merged - result_1 - result_2
         return result
-
-    @staticmethod
-    def to_float(count, linear_sum, squared_norm):
-        return float(count), linear_sum.astype(np.float32), squared_norm.astype(np.float32)
 
     @staticmethod
     def radius(count, linear_sum, squared_norm):
@@ -585,6 +588,7 @@ class BirchNode:
             for cf in self._clustering_features:
                 clusters.append(cf)
         else:
+            print self._clustering_features
             for cf in self._clustering_features:
                 clusters += cf.get_clusters()
         return clusters
@@ -772,11 +776,8 @@ class NonLeafClusteringFeature(ClusteringFeature):
 
     def get_clusters(self):
         max_size = self.birch.clusters_max_size
-        print self.size
-        if np.abs(self.size - 32213.0507714) < 10:
-            print "stop"
         if max_size is not None and self.size < max_size:
-            return self
+            return [self]
         return self.child.get_clusters()
 
     def add(self, index, data_point_cf):
