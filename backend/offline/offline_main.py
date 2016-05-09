@@ -1,3 +1,6 @@
+import sys
+sys.path.append('~/PycharmProjects/lightcurves-backend')
+
 from backend.offline.offline_interface import OfflineInterface
 from backend.data_model.data_model_interface import DataModelInterface, load_config
 import matplotlib.pyplot as plt
@@ -5,7 +8,6 @@ import numpy as np
 from scipy.special import gamma
 from backend.offline.offline_algorithms import Birch
 import time
-import sys
 
 def humanize_time(total_seconds):
     total_seconds = int(total_seconds)
@@ -28,7 +30,7 @@ def transfer_field_1():
 def cluster_field1(clustering_model):
     if clustering_model % 10 != 0:
         print ("### CLUSTERING FIELD 1 WITH model {0} ###".format(clustering_model))
-        config = load_config('/home/lucas/PycharmProjects/lightcurves-backend/backend/config.json')
+        config = load_config('/n/home09/lvalenzuela/backend/config.json')
         data_model_interface = DataModelInterface(config)
         offline_interface = OfflineInterface(data_model_interface, 3, clustering_model, clustering_model, clustering_model, 0)
         offline_interface.cluster_all()
