@@ -69,14 +69,15 @@ def clustering_test():
 def to_pands():
     config = load_config('/home/lucas/PycharmProjects/lightcurves-backend/backend/config.json')
     data_model_interface = DataModelInterface(config)
-    offline_interface = OfflineInterface(data_model_interface, 2, 0, 0, 0, 0)
-    offline_interface.to_pandas_dataframe('field1_df.pkl')
+    offline_interface = OfflineInterface(data_model_interface, 4, 0, 0, 0, 0)
+    offline_interface.to_pandas_dataframe('field2_df.pkl')
 
 if __name__ == "__main__":
     start = time.time()
     #clustering_model_index = 9
-    clustering_model_index = int(sys.argv[1])
-    cluster_field1(clustering_model_index)
+    # clustering_model_index = int(sys.argv[1])
+    # cluster_field1(clustering_model_index)
     # transfer_upto_field_2()
+    to_pands()
     end = time.time()
     print(humanize_time(end-start))
