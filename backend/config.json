@@ -108,7 +108,7 @@
             },
             {
               "type": "pandas",
-              "parameters": ["lightcurves_f_1", "/home/lucas/pandas_db"]
+              "parameters": ["lightcurves_f_1", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
             },
             {
               "type": "mongodb",
