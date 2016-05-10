@@ -582,7 +582,7 @@ class BirchNode:
             for cf in self._clustering_features:
                 clusters.append(cf)
         else:
-            print self._clustering_features
+            #print self._clustering_features
             for cf in self._clustering_features:
                 clusters += cf.get_clusters()
         return clusters

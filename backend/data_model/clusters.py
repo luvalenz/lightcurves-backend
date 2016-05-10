@@ -9,6 +9,7 @@ import itertools
 import gridfs
 import cPickle as pickle
 
+
 class ClustersDataBase:
     __metaclass__ = ABCMeta
 
@@ -353,7 +354,7 @@ class ClustersIterator(object):
             raise StopIteration
         data_ids = self._clusters[self._current_cluster_index]
         center = self._centers[self._current_cluster_index]
-        time_series_iterator = self._time_series_db.get_many(data_ids, None, False)
+        time_series_iterator = self._time_series_db.get_many(data_ids)
         cluster_obj = Cluster.from_time_series_sequence(time_series_iterator, center, self._current_cluster_index)
         self._current_cluster_index += 1
         return cluster_obj

@@ -26,14 +26,29 @@ def transfer_upto_field_2():
     offline_interface.fit_reduce_from_external_db('macho', source_db_index, n_fields)
     #offline_interface.reduce_from_external_db('macho', source_db_index, n_fields)
 
-def cluster_field2(clustering_model_index):
+def cluster(clustering_model_index, last_field, time_series_db_index):
     print ("### CLUSTERING FIELD 1 WITH model {0} ###".format(clustering_model_index))
     config = load_config('/n/home09/lvalenzuela/lightcurves-backend/backend/config.json')
     data_model_interface = DataModelInterface(config)
-    time_series_db_index = 5
-    serialization_db_index = clustering_model_index + 20
+    serialization_db_index = clustering_model_index
     offline_interface = OfflineInterface(data_model_interface, time_series_db_index, 0, serialization_db_index, clustering_model_index, 0)
     offline_interface.cluster_all()
+
+
+def store_field1_unbalanced():
+    seralization_db_indices = range(1, 20)
+    for clustering_db_index in seralization_db_indices:
+        if clustering_db_index % 10 != 0:
+            print ("### STORING FIELD 1 TO DB {0} ###".format(clustering_db_index))
+            config = load_config('/home/lucas/PycharmProjects/lightcurves-backend/backend/config.json')
+            data_model_interface = DataModelInterface(config)
+            time_series_db_index = 3
+            serialization_db_index = clustering_db_index
+            clustering_model_index = clustering_db_index
+            reduction_model_index = 0
+            offline_interface = OfflineInterface(data_model_interface, time_series_db_index, clustering_db_index,
+                 serialization_db_index, clustering_model_index, reduction_model_index)
+            offline_interface.store_all_clusters()
 
 def store_field1_balanced():
     dbs = range(21, 40)
@@ -75,10 +90,9 @@ def to_pands():
 
 if __name__ == "__main__":
     start = time.time()
-    #clustering_model_index = 9
     clustering_model_index = int(sys.argv[1])
-    cluster_field2(clustering_model_index)
-    # transfer_upto_field_2()
-    to_pands()
+    last_field = int(sys.argv[2])
+    time_series_db_index = int(sys.argv[3])
+    cluster(clustering_model_index, last_field, time_series_db_index)
     end = time.time()
     print(humanize_time(end-start))

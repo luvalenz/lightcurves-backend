@@ -431,6 +431,11 @@ class PandasTimeSeriesDataBase():
         return (DataMultibandTimeSeries(id_=element[0], reduced_vector=element[1].tolist())
                 for element in self._dataframe.iterrows())
 
+    def get_many(self, id_list):
+        df = self._dataframe.loc[id_list]
+        return (DataMultibandTimeSeries(id_=element[0], reduced_vector=element[1].tolist())
+                for element in df.iterrows())
+
 
 class MultibandTimeSeries(object):
     __metaclass__ = ABCMeta
