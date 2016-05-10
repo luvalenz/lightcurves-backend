@@ -77,7 +77,7 @@ if __name__ == "__main__":
     start = time.time()
     #clustering_model_index = 9
     clustering_model_index = int(sys.argv[1])
-    cluster_fields(clustering_model_index)
+    cluster_field2(clustering_model_index)
     # transfer_upto_field_2()
     to_pands()
     end = time.time()
