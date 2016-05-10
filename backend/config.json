@@ -113,8 +113,11 @@
             {
               "type": "mongodb",
               "parameters": [30000, "lightcurves_f_2", "localhost", 27017]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["lightcurves_f_2", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
             }
-
           ],
   "clustering_databases":
           [
@@ -322,8 +325,8 @@
               "parameters": ["serializations_f1_t9", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
             },
             {
-              "type": "pandas",
-              "parameters": ["serializations_f1_t10", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+              "type": null,
+              "parameters": null
             },
             {
               "type": "pandas",
@@ -364,6 +367,82 @@
             {
               "type": "mongodb",
               "parameters": ["serializations_f2", "localhost", 27017]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f2_t1", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f2_t2", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f2_t3", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f2_t4", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f2_t5", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f2_t6", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f2_t7", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f2_t8", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f2_t9", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": null,
+              "parameters": null
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f2_t0_1", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f2_t0_2", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f2_t0_3", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f2_t0_4", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f2_t0_5", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f2_t0_6", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f2_t0_7", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f2_t0_8", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f2_t0_9", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
             }
           ]
  }

@@ -26,13 +26,13 @@ def transfer_upto_field_2():
     offline_interface.fit_reduce_from_external_db('macho', source_db_index, n_fields)
     #offline_interface.reduce_from_external_db('macho', source_db_index, n_fields)
 
-def cluster_field1(clustering_model):
-    if clustering_model % 10 != 0:
-        print ("### CLUSTERING FIELD 1 WITH model {0} ###".format(clustering_model))
-        config = load_config('/n/home09/lvalenzuela/lightcurves-backend/backend/config.json')
-        data_model_interface = DataModelInterface(config)
-        offline_interface = OfflineInterface(data_model_interface, 3, clustering_model, clustering_model, clustering_model, 0)
-        offline_interface.cluster_all()
+def cluster_fields(clustering_model):
+    print ("### CLUSTERING FIELD 1 WITH model {0} ###".format(clustering_model))
+    config = load_config('/n/home09/lvalenzuela/lightcurves-backend/backend/config.json')
+    data_model_interface = DataModelInterface(config)
+    time_series_db_index = 5
+    offline_interface = OfflineInterface(data_model_interface, time_series_db_index, clustering_model, clustering_model, clustering_model, 0)
+    offline_interface.cluster_all()
 
 def store_field1_balanced():
     dbs = range(21, 40)
@@ -75,8 +75,8 @@ def to_pands():
 if __name__ == "__main__":
     start = time.time()
     #clustering_model_index = 9
-    # clustering_model_index = int(sys.argv[1])
-    # cluster_field1(clustering_model_index)
+    clustering_model_index = int(sys.argv[1])
+    cluster_fields(clustering_model_index)
     # transfer_upto_field_2()
     to_pands()
     end = time.time()
