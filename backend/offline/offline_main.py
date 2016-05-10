@@ -75,8 +75,8 @@ def to_pands():
 if __name__ == "__main__":
     start = time.time()
     #clustering_model_index = 9
-    # clustering_model_index = int(sys.argv[1])
-    # cluster_field1(clustering_model_index)
-    transfer_upto_field_2()
+    clustering_model_index = int(sys.argv[1])
+    cluster_field1(clustering_model_index)
+    # transfer_upto_field_2()
     end = time.time()
     print(humanize_time(end-start))
