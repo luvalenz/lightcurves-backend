@@ -29,7 +29,7 @@ def transfer_upto_field_2():
 def cluster_field1(clustering_model):
     if clustering_model % 10 != 0:
         print ("### CLUSTERING FIELD 1 WITH model {0} ###".format(clustering_model))
-        config = load_config('s')
+        config = load_config('/n/home09/lvalenzuela/lightcurves-backend/backend/config.json')
         data_model_interface = DataModelInterface(config)
         offline_interface = OfflineInterface(data_model_interface, 3, clustering_model, clustering_model, clustering_model, 0)
         offline_interface.cluster_all()
