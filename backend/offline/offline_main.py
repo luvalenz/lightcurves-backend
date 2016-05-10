@@ -26,12 +26,13 @@ def transfer_upto_field_2():
     offline_interface.fit_reduce_from_external_db('macho', source_db_index, n_fields)
     #offline_interface.reduce_from_external_db('macho', source_db_index, n_fields)
 
-def cluster_fields(clustering_model):
-    print ("### CLUSTERING FIELD 1 WITH model {0} ###".format(clustering_model))
+def cluster_field2(clustering_model_index):
+    print ("### CLUSTERING FIELD 1 WITH model {0} ###".format(clustering_model_index))
     config = load_config('/n/home09/lvalenzuela/lightcurves-backend/backend/config.json')
     data_model_interface = DataModelInterface(config)
     time_series_db_index = 5
-    offline_interface = OfflineInterface(data_model_interface, time_series_db_index, clustering_model, clustering_model, clustering_model, 0)
+    serialization_db_index = clustering_model_index + 20
+    offline_interface = OfflineInterface(data_model_interface, time_series_db_index, 0, serialization_db_index, clustering_model_index, 0)
     offline_interface.cluster_all()
 
 def store_field1_balanced():
