@@ -115,24 +115,32 @@ class SerializationPandasDatabase(object):
         self._path = path
 
     @property
+    def reduction_file_name(self):
+        return "{0}_reduction.pkl".format(self._name)
+
+    @property
+    def clustering_file_name(self):
+        return "{0}_clustering.pkl".format(self._name)
+
+    @property
     def has_reduction_model(self):
-        reduction_path = os.path.join(self._path, 'reduction.pkl')
+        reduction_path = os.path.join(self._path, self.reduction_file_name)
         return os.path.isfile(reduction_path)
 
     @property
     def has_clustering_model(self):
-        clustering_path = os.path.join(self._path, 'clustering.pkl')
+        clustering_path = os.path.join(self._path, self.clustering_file_name)
         return os.path.isfile(clustering_path)
 
     @property
     def reduction_model(self):
-        reduction_path = os.path.join(self._path, 'reduction.pkl')
+        reduction_path = os.path.join(self._path, self.reduction_file_name)
         with open(reduction_path, "rb") as input_file:
             return pickle.load(input_file)
 
     @property
     def clustering_model(self):
-        clustering_path = os.path.join(self._path, 'clustering.pkl')
+        clustering_path = os.path.join(self._path, self.clustering_file_name)
         with open(clustering_path, "rb") as input_file:
             return pickle.load(input_file)
 
@@ -140,9 +148,9 @@ class SerializationPandasDatabase(object):
         pass
 
     def store_reduction_model(self, model):
-        with open(os.path.join(self._path,  "{0}_reduction.pkl".format(self._name)), "wb") as input_file:
+        with open(os.path.join(self._path, self.reduction_file_name), "wb") as input_file:
             pickle.dump(model, input_file, 2)
 
     def store_clustering_model(self, model):
-        with open(os.path.join(self._path,  "{0}_clustering.pkl".format(self._name)), "wb") as input_file:
+        with open(os.path.join(self._path,  self.clustering_file_name), "wb") as input_file:
             pickle.dump(model, input_file, 2)
