@@ -17,20 +17,19 @@ def humanize_time(total_seconds):
     seconds = remainder % 60
     return "{0}:{1}:{2}".format(hours, minutes, seconds)
 
-def transfer_field_1():
+def transfer_upto_field_2():
     config = load_config('/home/lucas/PycharmProjects/lightcurves-backend/backend/config.json')
     data_model_interface = DataModelInterface(config)
-    offline_interface = OfflineInterface(data_model_interface, 2, 0, 0, 0, 0)
-    #offline_interface.fit_reduce_from_external_db('macho', 1, 1)
+    offline_interface = OfflineInterface(data_model_interface, 4, 0, 20, 0, 0)
     source_db_index = 1
-    source_db = data_model_interface.get_time_series_database(source_db_index)
-    n_fields = 1
-    offline_interface.reduce_from_external_db('macho', 0, source_db, n_fields)
+    n_fields = 2
+    offline_interface.fit_reduce_from_external_db('macho', source_db_index, n_fields)
+    #offline_interface.reduce_from_external_db('macho', source_db_index, n_fields)
 
 def cluster_field1(clustering_model):
     if clustering_model % 10 != 0:
         print ("### CLUSTERING FIELD 1 WITH model {0} ###".format(clustering_model))
-        config = load_config('/n/home09/lvalenzuela/lightcurves-backend/backend/config.json')
+        config = load_config('s')
         data_model_interface = DataModelInterface(config)
         offline_interface = OfflineInterface(data_model_interface, 3, clustering_model, clustering_model, clustering_model, 0)
         offline_interface.cluster_all()
@@ -76,7 +75,8 @@ def to_pands():
 if __name__ == "__main__":
     start = time.time()
     #clustering_model_index = 9
-    clustering_model_index = int(sys.argv[1])
-    cluster_field1(clustering_model_index)
+    # clustering_model_index = int(sys.argv[1])
+    # cluster_field1(clustering_model_index)
+    transfer_upto_field_2()
     end = time.time()
     print(humanize_time(end-start))

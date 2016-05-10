@@ -109,6 +109,10 @@
             {
               "type": "pandas",
               "parameters": ["lightcurves_f_1", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "mongodb",
+              "parameters": [30000, "lightcurves_f_2", "localhost", 27017]
             }
 
           ],
@@ -358,12 +362,8 @@
               "parameters": ["serializations_f1_t0_9", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
             },
             {
-              "type": "pandas",
-              "parameters": ["serializations_f1_t1_c10000", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
-            },
-            {
-              "type": "pandas",
-              "parameters": ["serializations", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+              "type": "mongodb",
+              "parameters": ["serializations_f2", "localhost", 27017]
             }
           ]
  }

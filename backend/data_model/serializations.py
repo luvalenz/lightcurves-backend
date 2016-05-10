@@ -140,9 +140,9 @@ class SerializationPandasDatabase(object):
         pass
 
     def store_reduction_model(self, model):
-        with open(os.path.join(self._path,  "reduction.pkl"), "wb") as input_file:
+        with open(os.path.join(self._path,  "{0}_reduction.pkl".format(self._name)), "wb") as input_file:
             pickle.dump(model, input_file, 2)
 
     def store_clustering_model(self, model):
-        with open(os.path.join(self._path,  "clustering.pkl"), "wb") as input_file:
+        with open(os.path.join(self._path,  "{0}_clustering.pkl".format(self._name)), "wb") as input_file:
             pickle.dump(model, input_file, 2)
