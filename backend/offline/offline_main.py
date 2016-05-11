@@ -36,19 +36,19 @@ def cluster(clustering_model_index, last_field, time_series_db_index):
 
 
 def store_field1_unbalanced():
-    seralization_db_indices = range(1, 20)
-    for clustering_db_index in seralization_db_indices:
-        if clustering_db_index % 10 != 0:
-            print ("### STORING FIELD 1 TO DB {0} ###".format(clustering_db_index))
-            config = load_config('/home/lucas/PycharmProjects/lightcurves-backend/backend/config.json')
-            data_model_interface = DataModelInterface(config)
-            time_series_db_index = 3
-            serialization_db_index = clustering_db_index
-            clustering_model_index = clustering_db_index
-            reduction_model_index = 0
-            offline_interface = OfflineInterface(data_model_interface, time_series_db_index, clustering_db_index,
-                 serialization_db_index, clustering_model_index, reduction_model_index)
-            offline_interface.store_all_clusters()
+    clustering_db_indices = range(20)
+    for clustering_db_index in clustering_db_indices:
+        print ("### STORING FIELD 1 TO DB {0} ###".format(clustering_db_index))
+        config = load_config('/home/lucas/PycharmProjects/lightcurves-backend/backend/config.json')
+        data_model_interface = DataModelInterface(config)
+        time_series_db_index = 3
+        serialization_db_index = clustering_db_index
+        clustering_model_index = clustering_db_index
+        reduction_model_index = 0
+        offline_interface = OfflineInterface(data_model_interface, time_series_db_index, clustering_db_index,
+             serialization_db_index, clustering_model_index, reduction_model_index)
+        print(offline_interface.serialization_db._name)
+        offline_interface.store_all_clusters()
 
 def store_field1_balanced():
     dbs = range(21, 40)
@@ -94,5 +94,6 @@ if __name__ == "__main__":
     last_field = int(sys.argv[2])
     time_series_db_index = int(sys.argv[3])
     cluster(clustering_model_index, last_field, time_series_db_index)
+    # store_field1_unbalanced()
     end = time.time()
     print(humanize_time(end-start))

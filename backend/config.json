@@ -121,169 +121,165 @@
           ],
   "clustering_databases":
           [
-            { 
-              "type": null,
-              "parameters": null
+            {
+              "type": "mongodb",
+              "parameters": ["clusters_f1_unbalanced_t2000000", "localhost", 27017]
             },
             {
               "type": "mongodb",
-              "parameters": ["clusters_f1_unbalanced_t1", "localhost", 27017]
+              "parameters": ["clusters_f1_unbalanced_t4000000", "localhost", 27017]
             },
             {
               "type": "mongodb",
-              "parameters": ["clusters_f1_unbalanced_t2", "localhost", 27017]
+              "parameters": ["clusters_f1_unbalanced_t6000000", "localhost", 27017]
             },
             {
               "type": "mongodb",
-              "parameters": ["clusters_f1_unbalanced_t3", "localhost", 27017]
+              "parameters": ["clusters_f1_unbalanced_t8000000", "localhost", 27017]
             },
             {
               "type": "mongodb",
-              "parameters": ["clusters_f1_unbalanced_t4", "localhost", 27017]
+              "parameters": ["clusters_f1_unbalanced_t10000000", "localhost", 27017]
             },
             {
               "type": "mongodb",
-              "parameters": ["clusters_f1_unbalanced_t5", "localhost", 27017]
+              "parameters": ["clusters_f1_unbalanced_t12000000", "localhost", 27017]
             },
             {
               "type": "mongodb",
-              "parameters": ["clusters_f1_unbalanced_t6", "localhost", 27017]
+              "parameters": ["clusters_f1_unbalanced_t14000000", "localhost", 27017]
             },
             {
               "type": "mongodb",
-              "parameters": ["clusters_f1_unbalanced_t7", "localhost", 27017]
+              "parameters": ["clusters_f1_unbalanced_t16000000", "localhost", 27017]
             },
             {
               "type": "mongodb",
-              "parameters": ["clusters_f1_unbalanced_t8", "localhost", 27017]
+              "parameters": ["clusters_f1_unbalanced_t18000000", "localhost", 27017]
             },
             {
               "type": "mongodb",
-              "parameters": ["clusters_f1_unbalanced_t9", "localhost", 27017]
-            },
-            { 
-              "type": null,
-              "parameters": null
+              "parameters": ["clusters_f1_unbalanced_t20000000", "localhost", 27017]
             },
             {
               "type": "mongodb",
-              "parameters": ["clusters_f1_unbalanced_t0_1", "localhost", 27017]
+              "parameters": ["clusters_f1_unbalanced_t22000000", "localhost", 27017]
             },
             {
               "type": "mongodb",
-              "parameters": ["clusters_f1_unbalanced_t0_2", "localhost", 27017]
+              "parameters": ["clusters_f1_unbalanced_t24000000", "localhost", 27017]
             },
             {
               "type": "mongodb",
-              "parameters": ["clusters_f1_unbalanced_t0_3", "localhost", 27017]
+              "parameters": ["clusters_f1_unbalanced_t26000000", "localhost", 27017]
             },
             {
               "type": "mongodb",
-              "parameters": ["clusters_f1_unbalanced_t0_4", "localhost", 27017]
+              "parameters": ["clusters_f1_unbalanced_t28000000", "localhost", 27017]
             },
             {
               "type": "mongodb",
-              "parameters": ["clusters_f1_unbalanced_t0_5", "localhost", 27017]
+              "parameters": ["clusters_f1_unbalanced_t30000000", "localhost", 27017]
             },
             {
               "type": "mongodb",
-              "parameters": ["clusters_f1_unbalanced_t0_6", "localhost", 27017]
+              "parameters": ["clusters_f1_unbalanced_t32000000", "localhost", 27017]
             },
             {
               "type": "mongodb",
-              "parameters": ["clusters_f1_unbalanced_t0_7", "localhost", 27017]
+              "parameters": ["clusters_f1_unbalanced_t34000000", "localhost", 27017]
             },
             {
               "type": "mongodb",
-              "parameters": ["clusters_f1_unbalanced_t0_8", "localhost", 27017]
+              "parameters": ["clusters_f1_unbalanced_t36000000", "localhost", 27017]
             },
             {
               "type": "mongodb",
-              "parameters": ["clusters_f1_unbalanced_t0_9", "localhost", 27017]
-            },
-            { 
-              "type": null,
-              "parameters": null
+              "parameters": ["clusters_f1_unbalanced_t38000000", "localhost", 27017]
             },
             {
               "type": "mongodb",
-              "parameters": ["clusters_f1_balanced_t1", "localhost", 27017]
-            },
-            {
-              "type": "mongodb",
-              "parameters": ["clusters_f1_balanced_t2", "localhost", 27017]
-            },
-            {
-              "type": "mongodb",
-              "parameters": ["clusters_f1_balanced_t3", "localhost", 27017]
-            },
-            {
-              "type": "mongodb",
-              "parameters": ["clusters_f1_balanced_t4", "localhost", 27017]
-            },
-            {
-              "type": "mongodb",
-              "parameters": ["clusters_f1_balanced_t5", "localhost", 27017]
-            },
-            {
-              "type": "mongodb",
-              "parameters": ["clusters_f1_balanced_t6", "localhost", 27017]
-            },
-            {
-              "type": "mongodb",
-              "parameters": ["clusters_f1_balanced_t7", "localhost", 27017]
-            },
-            {
-              "type": "mongodb",
-              "parameters": ["clusters_f1_balanced_t8", "localhost", 27017]
-            },
-            {
-              "type": "mongodb",
-              "parameters": ["clusters_f1_balanced_t9", "localhost", 27017]
-            },
-            { 
-              "type": null,
-              "parameters": null
-            },
-            {
-              "type": "mongodb",
-              "parameters": ["clusters_f1_balanced_t0_1", "localhost", 27017]
-            },
-            {
-              "type": "mongodb",
-              "parameters": ["clusters_f1_balanced_t0_2", "localhost", 27017]
-            },
-            {
-              "type": "mongodb",
-              "parameters": ["clusters_f1_balanced_t0_3", "localhost", 27017]
-            },
-            {
-              "type": "mongodb",
-              "parameters": ["clusters_f1_balanced_t0_4", "localhost", 27017]
-            },
-            {
-              "type": "mongodb",
-              "parameters": ["clusters_f1_balanced_t0_5", "localhost", 27017]
-            },
-            {
-              "type": "mongodb",
-              "parameters": ["clusters_f1_balanced_t0_6", "localhost", 27017]
-            },
-            {
-              "type": "mongodb",
-              "parameters": ["clusters_f1_balanced_t0_7", "localhost", 27017]
-            },
-            {
-              "type": "mongodb",
-              "parameters": ["clusters_f1_balanced_t0_8", "localhost", 27017]
-            },
-            {
-              "type": "mongodb",
-              "parameters": ["clusters_f1_balanced_t0_9", "localhost", 27017]
+              "parameters": ["clusters_f1_unbalanced_t40000000", "localhost", 27017]
             }
           ],
   "serialization_databases":
           [
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f1_t100000", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f1_t200000", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f1_t300000", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f1_t400000", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f1_t500000", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f1_t600000", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f1_t700000", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f1_t800000", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f1_t900000", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f1_t1000000", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f1_t1100000", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f1_t1200000", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f1_t1300000", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f1_t1400000", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f1_t1500000", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f1_t1600000", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f1_t1700000", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f1_t1800000", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
+            {
+              "type": "pandas",
+              "parameters": ["serializations_f1_t1900000", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
+            },
             {
               "type": "pandas",
               "parameters": ["serializations_f1_t2000000", "/n/home09/lvalenzuela/TSC/lucas/pandas_db"]
