@@ -30,7 +30,10 @@ def cluster(clustering_model_index, last_field, time_series_db_index):
     print ("### CLUSTERING FIELD 1 WITH model {0} ###".format(clustering_model_index))
     config = load_config('/n/home09/lvalenzuela/lightcurves-backend/backend/config.json')
     data_model_interface = DataModelInterface(config)
-    serialization_db_index = clustering_model_index
+    if last_field == 1:
+        serialization_db_index = clustering_model_index
+    elif last_field == 2:
+        serialization_db_index = clustering_model_index + 50
     offline_interface = OfflineInterface(data_model_interface, time_series_db_index, 0, serialization_db_index, clustering_model_index, 0)
     offline_interface.cluster_all()
 
@@ -44,6 +47,21 @@ def store_field1_unbalanced():
         time_series_db_index = 3
         serialization_db_index = clustering_db_index
         clustering_model_index = clustering_db_index
+        reduction_model_index = 0
+        offline_interface = OfflineInterface(data_model_interface, time_series_db_index, clustering_db_index,
+             serialization_db_index, clustering_model_index, reduction_model_index)
+        print(offline_interface.serialization_db._name)
+        offline_interface.store_all_clusters()
+
+def store_field2_unbalanced():
+    clustering_db_indices = range(1,19)
+    for clustering_db_index in clustering_db_indices:
+        print ("### STORING FIELD 1 TO DB {0} ###".format(clustering_db_index))
+        config = load_config('/home/lucas/PycharmProjects/lightcurves-backend/backend/config.json')
+        data_model_interface = DataModelInterface(config)
+        time_series_db_index = 3
+        serialization_db_index = clustering_db_index
+        clustering_model_index = clustering_db_index - 50
         reduction_model_index = 0
         offline_interface = OfflineInterface(data_model_interface, time_series_db_index, clustering_db_index,
              serialization_db_index, clustering_model_index, reduction_model_index)
