@@ -90,10 +90,10 @@ def to_pands():
 
 if __name__ == "__main__":
     start = time.time()
-    # clustering_model_index = int(sys.argv[1])
-    # last_field = int(sys.argv[2])
-    # time_series_db_index = int(sys.argv[3])
-    # cluster(clustering_model_index, last_field, time_series_db_index)
-    store_field1_unbalanced()
+    clustering_model_index = int(sys.argv[1])
+    last_field = int(sys.argv[2])
+    time_series_db_index = int(sys.argv[3])
+    cluster(clustering_model_index, last_field, time_series_db_index)
+    # store_field1_unbalanced()
     end = time.time()
     print(humanize_time(end-start))
