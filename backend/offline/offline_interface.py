@@ -218,7 +218,6 @@ class OfflineInterface(object):
         self._cluster(batch_iterable)
     
     def store_all_clusters(self, clusters_max_size=None):
-        print(self.clustering_model.threshold)
         if clusters_max_size is not None:
             self.clustering_model.clusters_max_size = clusters_max_size
         n_clusters = int(self.clustering_model.get_number_of_clusters())

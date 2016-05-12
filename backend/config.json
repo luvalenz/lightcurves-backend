@@ -71,10 +71,6 @@
             },
             {
               "type": "birch",
-              "parameters": [3500, false]
-            },
-            {
-              "type": "birch",
               "parameters": [4000, false]
             },
             {

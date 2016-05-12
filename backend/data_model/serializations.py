@@ -154,3 +154,8 @@ class SerializationPandasDatabase(object):
     def store_clustering_model(self, model):
         with open(os.path.join(self._path,  self.clustering_file_name), "wb") as input_file:
             pickle.dump(model, input_file, 2)
+
+    def change_clustering_file_name(self, new_name):
+        old = os.path.join(self._path, self.clustering_file_name)
+        new = os.path.join(self._path, new_name)
+        os.rename(old, new)

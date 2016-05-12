@@ -39,7 +39,7 @@ def cluster(clustering_model_index, last_field, time_series_db_index):
 
 
 def store_field1_unbalanced():
-    clustering_db_indices = range(1,19)
+    clustering_db_indices = range(41)
     for clustering_db_index in clustering_db_indices:
         print ("### STORING FIELD 1 TO DB {0} ###".format(clustering_db_index))
         config = load_config('/home/lucas/PycharmProjects/lightcurves-backend/backend/config.json')
@@ -69,7 +69,7 @@ def store_field2_unbalanced():
         offline_interface.store_all_clusters()
 
 def store_field1_balanced():
-    dbs = range(1,21)
+    dbs = range(41,49)
     max_radii = np.hstack((range(1,10), np.arange(0.1,1,0.1)))
     for clustering_db_index, max_size in zip(dbs, max_radii):
         if clustering_db_index % 10 != 0:
