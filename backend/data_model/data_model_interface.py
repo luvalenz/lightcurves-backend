@@ -54,7 +54,10 @@ class DataModelInterface(object):
             Database = MachoFileDataBase
         elif model_type == 'pandas':
             Database = PandasTimeSeriesDataBase
-        return Database(*parameters)
+        if Database is PandasTimeSeriesDataBase:
+            return Database.from_pickle(*parameters)
+        else:
+            return Database(*parameters)
 
     def get_clustering_database(self, index=0):
         db_info = self._config['clustering_databases'][index]

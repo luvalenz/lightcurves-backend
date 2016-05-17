@@ -25,6 +25,26 @@ class TimeSeriesDataBase(object):
     def catalog_names(self):
         pass
 
+    @abstractproperty
+    def data_sum(self):
+        pass
+
+    @abstractproperty
+    def squares_sum(self):
+        pass
+
+    @abstractproperty
+    def mean(self):
+        pass
+
+    @abstractproperty
+    def n(self):
+        pass
+
+    @abstractproperty
+    def std(self):
+        pass
+
     @abstractmethod
     def setup(self):
         pass
@@ -58,10 +78,6 @@ class TimeSeriesDataBase(object):
         pass
 
     @abstractmethod
-    def add_one(self, data):
-        pass
-
-    @abstractmethod
     def add_many(self, catalog, data):
         pass
 
@@ -89,6 +105,14 @@ class TimeSeriesDataBase(object):
     def get_reduced_vector(self, id_):
         pass
 
+    @abstractmethod
+    def set_info(self, data_sum, squares_sum):
+        pass
+
+    @abstractmethod
+    def update_info(self, data_sum, squares_sum):
+        pass
+
 
 class MachoFileDataBase(TimeSeriesDataBase):
 
@@ -101,6 +125,40 @@ class MachoFileDataBase(TimeSeriesDataBase):
     @property
     def catalog_names(self):
         pass
+
+    @property
+    def data_sum(self):
+        pass
+
+    @property
+    def squares_sum(self):
+        pass
+
+    @property
+    def mean(self):
+        pass
+
+    @property
+    def std(self):
+        pass
+
+    @property
+    def n(self):
+        pass
+
+    def partial_measures(self, n_fields):
+        batch_iterable = self.get_all(n_fields)
+        feature_vectors = []
+        for batch in batch_iterable:
+            if len(batch) != 0:
+                for time_series in batch:
+                    feature_vector = time_series.feature_vector
+                    if feature_vector is not None and len(feature_vector) != 0:
+                        feature_vectors.append(feature_vector)
+        feature_matrix = np.vstack(feature_vectors)
+        partial_mean = np.mean(feature_matrix, axis=0)
+        partial_std = np.std(feature_matrix, axis=0)
+        return partial_mean, partial_std
 
     def setup(self):
         pass
@@ -265,6 +323,12 @@ class MachoFileDataBase(TimeSeriesDataBase):
     def get_original_bands(self, id_):
         pass
 
+    def set_info(self, data_sum, squares_sum):
+        pass
+
+    def update_info(self, data_sum, squares_sum, n):
+        pass
+
 
 class MongoTimeSeriesDataBase(TimeSeriesDataBase):
 
@@ -281,6 +345,32 @@ class MongoTimeSeriesDataBase(TimeSeriesDataBase):
         if 'system.indexes' in collection_names:
             collection_names.remove('system.indexes')
         return collection_names
+
+    @property
+    def data_sum(self):
+        collection = self.db['info']
+        info = collection.find_one({})
+        return np.array(info['sum'])
+
+    @property
+    def squares_sum(self):
+        collection = self.db['info']
+        info = collection.find_one({})
+        return np.array(info['squares'])
+
+    @property
+    def mean(self):
+        self.data_sum/self.n
+
+    @property
+    def std(self):
+        (self.squares_sum - self.data_sum**2/self.n)/self.n
+
+    @property
+    def n(self):
+        collection = self.db['n']
+        info = collection.find_one({})
+        return info['n']
 
     #must be called after adding elements to the db
     def setup(self):
@@ -379,22 +469,31 @@ class MongoTimeSeriesDataBase(TimeSeriesDataBase):
                 bulk.find({'id':time_series.id}).replace_one(updated_datum)
         bulk.execute()
 
-    #can receive TimeSeries object or dict
-    def add_one(self, catalog_name, datum):
-        collection = self.db[catalog_name]
-        if not isinstance(datum, dict):
-            datum = datum.to_dict()
-        collection.insert_one(datum)
-
     def add_many(self, catalog_name, data):
         collection = self.db[catalog_name]
         ids = []
         data_dicts = []
+        data_sum = None
+        square_sum = None
+        n = 0
         for datum in data:
             datum_dict = datum if isinstance(datum, dict) else datum.to_dict()
+            if 'features' in data_dicts:
+                features = np.array(data_dicts['features'])
+                if len(features) != 0:
+                    squares = features**2
+                    if data_sum is None:
+                        data_sum = features
+                        square_sum = squares
+                    else:
+                        data_sum += features
+                        square_sum += squares
+                    n += 1
             data_dicts.append(datum_dict)
             ids.append(datum_dict['id'])
         collection.insert_many(data_dicts)
+        if data_sum is not None:
+            self.update_info(data_sum, square_sum, n)
         return ids
 
     def delete_one(self, catalog_name, id_):
@@ -417,15 +516,60 @@ class MongoTimeSeriesDataBase(TimeSeriesDataBase):
         bands_dict = self.get_one_dict(catalog_name, id_)['bands']
         return DataMultibandTimeSeries.extract_bands_dict(bands_dict)
 
+    def set_info(self, sum, square_sum, n):
+        collection = self.db['info']
+        collection.insert_one({'sum':sum, 'squares':square_sum, 'n': n})
+
+    def update_info(self, data_sum_inc, squares_sum_inc, n_inc):
+        collection = self.db['info']
+        info = collection.find_one({})
+        if info is not None:
+            data_sum = np.array(info['sum']) + data_sum_inc
+            n = info['n'] + n_inc
+            squares_sum = np.array(info['squares']) + squares_sum_inc
+            collection.replace_one({}, {'sum':data_sum, 'squares': squares_sum, 'n': n})
+        else:
+            collection.insert_one({'sum':data_sum_inc, 'squares': squares_sum_inc, 'n': n_inc})
+
 
 class PandasTimeSeriesDataBase():
 
-    def __init__(self, name, path):
-        self._path = path
+    def __init__(self, name, dataframe, data_sum, squares_sum):
         self._name = name
-        with open(os.path.join(path, '{0}.pkl'.format(name))) as file_input:
-            dataframe = pickle.load(file_input)
         self._dataframe = dataframe
+        self._data_sum = data_sum
+        self._squares_sum = squares_sum
+
+    @property
+    def data_sum(self):
+        return self._data_sum
+
+    @property
+    def squares_sum(self):
+        return self._squares_sum
+
+    @property
+    def mean(self):
+        self.data_sum/self.n
+
+    @property
+    def std(self):
+        (self.squares_sum - self.data_sum**2/self.n)/self.n
+
+    @property
+    def n(self):
+        return len(self._dataframe)
+
+    @staticmethod
+    def from_pickle(path, name):
+        with open(os.path.join(path, '{0}.pkl'.format(name))) as file_input:
+            obj = pickle.load(file_input)
+        return obj
+
+    def to_pickle(self, path):
+        full_path = os.path.join(path, self._name)
+        with open(full_path, 'wb') as file_input:
+            pickle.dump(self, file_input, 2)
 
     def get_all(self):
         return (DataMultibandTimeSeries(id_=element[0], reduced_vector=element[1].tolist())
@@ -435,6 +579,9 @@ class PandasTimeSeriesDataBase():
         df = self._dataframe.loc[id_list]
         return (DataMultibandTimeSeries(id_=element[0], reduced_vector=element[1].tolist())
                 for element in df.iterrows())
+
+    def udpdate_info(self, catalog_name, sum, square_sum):
+        pass
 
 
 class MultibandTimeSeries(object):

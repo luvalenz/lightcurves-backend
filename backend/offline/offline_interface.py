@@ -1,6 +1,7 @@
 __author__ = 'lucas'
 
 from backend.data_model.data_model_interface import DataModelInterface
+from backend.data_model.time_series import PandasTimeSeriesDataBase
 import itertools
 import numpy as np
 import pandas as pd
@@ -75,6 +76,8 @@ class OfflineInterface(object):
         return added_ids
 
     def fit_reduction_with_external_db(self, source_db, n_fields):
+        mean, std = source_db.partial_measures(n_fields)
+        self.reduction_model.set_measures(mean, std)
         batch_iterable = source_db.get_all(n_fields, False)
         total_added = 0
         for batch in batch_iterable:
@@ -129,6 +132,9 @@ class OfflineInterface(object):
     
     def calculate_missing_features(self, batch_size=None):
         batch_iterable = self.time_series_db.find_many(None, {"features":{"$in": [{}, None]}}, True, batch_size)
+        data_sum = None
+        squares_sum = None
+        n = 0
         for batch in batch_iterable:
             updated = []
             for time_series in batch:
@@ -137,27 +143,53 @@ class OfflineInterface(object):
                     time_series.calculate_features()
                     updated.append(time_series)
                     print("DONE")
+                features = np.array(time_series.feature_vector)
+                squares = features**2
+                if data_sum is None:
+                    data_sum = features
+                    squares_sum = squares
+                else:
+                    data_sum += features
+                    squares_sum += squares
+                n += 1
             if len(updated) != 0:
                 print("Updating values to database..."),
                 self.time_series_db.update_many(updated)
+                self.time_series_db.update_info(data_sum, squares_sum, n)
                 print("DONE")
     
     def recalculate_all_features(self, batch_size=None):
-        batch_iterable = self.time_series_db.get_all(True, batch_size)
+        batch_iterable = self.time_series_db.get_all(None, True, batch_size)
+        data_sum = None
+        squares_sum = None
+        n = 0
         for batch in batch_iterable:
             updated = []
             for time_series in batch:
                 print("Calculating features for time series {0}".format(time_series.id)),
                 time_series.calculate_features()
                 updated.append(time_series)
+                features = np.array(time_series.feature_vector)
+                squares = features**2
+                if data_sum is None:
+                    data_sum = features
+                    squares_sum = squares
+                else:
+                    data_sum += features
+                    squares_sum += squares
+                n += 1
                 print("DONE")
             if len(updated) != 0:
                 print("Updating values to database..."),
                 self.time_series_db.update_many(updated)
+                self.time_series_db.update_info(data_sum, squares_sum, n)
                 print("DONE")
 
     def _reduce(self, time_series_iterable):
         print("Trying to add {0} time series to reduction model... ".format(len(time_series_iterable))),
+        mean = self.time_series_db.mean
+        std = self.time_series_db.std
+        self.reduction_model.set_measures(mean, std)
         n_added = self.reduction_model.add_many_time_series(time_series_iterable)
         print("DONE, {0} added".format(n_added))
         print("Fitting model... "),
@@ -179,10 +211,6 @@ class OfflineInterface(object):
         time_series_iterator = self.time_series_db.get_all()
         self._reduce(time_series_iterator)
 
-    def reduce_some(self, time_series_ids, catalog_name=None):
-        time_series_iterator = self.time_series_db.get_many(time_series_ids, catalog_name, False)
-        self._reduce(time_series_iterator)
-
     def _cluster(self, time_series_sequence):
         print("Trying to add time series to clustering model... "),
         n_added = self.clustering_model.add_many_time_series(time_series_sequence)
@@ -195,7 +223,7 @@ class OfflineInterface(object):
         time_series_sequence = self.time_series_db.get_all()
         self._cluster(time_series_sequence)
 
-    def to_pandas_dataframe(self, path):
+    def to_pandas_dataframe(self, path, name):
         reduced_vectors = []
         ids = []
         time_series_sequence = self.time_series_db.get_all()
@@ -209,9 +237,11 @@ class OfflineInterface(object):
                 print(i)
             i += 1
         reduced_matrix = np.vstack(reduced_vectors)
+        data_sum = np.sum(reduced_matrix, axis=0)
+        squares_sum = np.sum(reduced_matrix**2, axis=0)
         df = pd.DataFrame(reduced_matrix, ids)
-        df.to_pickle(path)
-
+        db = PandasTimeSeriesDataBase(name, df, data_sum, squares_sum)
+        db.to_pickle(path)
 
     def cluster_some(self, time_series_ids, catalog_name=None):
         batch_iterable = self.time_series_db.get_many(time_series_ids, catalog_name, False)
@@ -220,6 +250,10 @@ class OfflineInterface(object):
     def store_all_clusters(self, clusters_max_size=None):
         if clusters_max_size is not None:
             self.clustering_model.clusters_max_size = clusters_max_size
+            print("max_size = {0}".format(clusters_max_size))
+            db_name = self.clustering_db.db_name
+            print("db name = {0}").format(db_name)
+            print(self.clustering_model.threshold)
         n_clusters = int(self.clustering_model.get_number_of_clusters())
         self.clustering_db.reset_database(self.clustering_model.metadata)
         print("Storing {0} clusters...".format(n_clusters))

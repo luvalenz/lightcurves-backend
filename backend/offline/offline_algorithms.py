@@ -777,6 +777,13 @@ class NonLeafClusteringFeature(ClusteringFeature):
     def add(self, index, data_point_cf):
         self.child.add(index, data_point_cf)
 
+    def get_indices(self):
+        indices = []
+        cfs = self.child._clustering_features
+        for cf in cfs:
+            indices += cf.get_indices()
+        return indices
+
 
 class IncrementalDimensionalityReduction:
     __metaclass__ = ABCMeta
@@ -807,6 +814,16 @@ class ScikitIncrementalPCAWrapper(IncrementalDimensionalityReduction):
     def __init__(self, n_components=None):
         self._scikit_ipca = ScikitIPCA(n_components)
         self._data_ids = []
+        self._mean = None
+        self._std = None
+
+
+    def standarize(self, x):
+        return np.nan_to_num((x - self._mean)/self._std)
+
+    def set_measures(self, mean, std):
+        self._mean = mean
+        self._std = std
 
     def add_many_time_series(self, time_series_list):
         vectors_to_add = []
@@ -825,11 +842,7 @@ class ScikitIncrementalPCAWrapper(IncrementalDimensionalityReduction):
         return n_added
 
     def transform_one_time_series(self, time_series):
-        feature_vector = time_series.feature_vector
-        id_ = time_series.id
-        reduced_vector = self._scikit_ipca(feature_vector, id_)
-        time_series.set_reduced(reduced_vector.tolist())
-        return time_series
+        pass
 
     def transform_many_time_series(self, time_series_sequence):
         feature_vectors = []
@@ -845,7 +858,8 @@ class ScikitIncrementalPCAWrapper(IncrementalDimensionalityReduction):
                 catalogs.append(catalog)
         if len(feature_vectors) != 0:
             feature_matrix = np.vstack(feature_vectors)
-            reduced_matrix = self._scikit_ipca.transform(feature_matrix)
+            standarized_feature_matrix = self.standarize(feature_matrix)
+            reduced_matrix = self._scikit_ipca.transform(standarized_feature_matrix)
             return (DataMultibandTimeSeries(None, None, None, None, id_, None, reduced_vector, None, {'catalog': catalog})
                     for id_, catalog, reduced_vector in itertools.izip(ids, catalogs, reduced_matrix))
         return None
@@ -859,7 +873,8 @@ class ScikitIncrementalPCAWrapper(IncrementalDimensionalityReduction):
         return False
 
     def _add_matrix(self, data_matrix, data_ids):
-        self._scikit_ipca.partial_fit(data_matrix)
+        standarized_data_matrix = self.standarize(data_matrix)
+        self._scikit_ipca.partial_fit(standarized_data_matrix)
         self._data_ids += data_ids
 
 
