@@ -136,4 +136,4 @@ if __name__ == '__main__':
                            transfer_rate, seek_time, dimensionality, scalar_size, metadata_size,
                            n_clusters_function, n_cluster_after_pass_function,
                            n_lc_after_pass_function, n_lc_per_cluster, number_of_lc, gpu_memory)
-    times.plot(True, True)
+    times.plot(False, False)

@@ -29,8 +29,8 @@ def transfer_upto_field_1():
 
 def cluster(clustering_model_index, last_field, time_series_db_index):
     print ("### CLUSTERING FIELD 1 WITH model {0} ###".format(clustering_model_index))
-    #config = load_config('/n/home09/lvalenzuela/lightcurves-backend/backend/config.json')
-    config = load_config('/home/lucas/PycharmProjects/lightcurves-backend/backend/config.json')
+    config = load_config('/n/home09/lvalenzuela/lightcurves-backend/backend/config.json')
+    #config = load_config('/home/lucas/PycharmProjects/lightcurves-backend/backend/config.json')
     data_model_interface = DataModelInterface(config)
     serialization_db_index = clustering_model_index
     offline_interface = OfflineInterface(data_model_interface, time_series_db_index, 0, serialization_db_index, clustering_model_index, 0)
